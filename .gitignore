@@ -1,0 +1,81 @@
+# OS and editor files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+.atom/
+.history/
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Logs and temporary files
+*.log
+*.class
+*.pyc
+.build/
+.buildlog/
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# Dart and Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+coverage/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+app.*.symbols
+app.*.map.json
+
+# Android and Gradle
+android/.gradle/
+android/.cxx/
+android/captures/
+android/local.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+
+# iOS and Xcode
+**/DerivedData/
+**/Pods/
+**/.symlinks/
+**/xcuserdata/
+**/Flutter/ephemeral/
+**/Flutter/Generated.xcconfig
+**/Flutter/flutter_export_environment.sh
+**/Flutter/flutter_assets/
+**/ServiceDefinitions.json
+
+# Windows and Visual Studio
+windows/flutter/ephemeral/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+x64/
+x86/
+*.[Cc]ache
+!*.[Cc]ache/
+
+# Local secrets and signing files
+.env
+.env.*
+!.env.example
+local.properties
+key.properties
+*.jks
+*.keystore
+*.p12
+*.pem
