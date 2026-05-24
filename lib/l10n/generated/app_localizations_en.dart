@@ -18,6 +18,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get switchLanguage => 'Switch language';
 
   @override
+  String get settings => 'Settings';
+
+  @override
+  String get language => 'Language';
+
+  @override
+  String get selectLanguage => 'Select language';
+
+  @override
+  String get autoRefreshInterval => 'Auto refresh interval';
+
+  @override
+  String get selectAutoRefreshInterval => 'Select auto refresh interval';
+
+  @override
+  String secondsInterval(int seconds) {
+    return '${seconds}s';
+  }
+
+  @override
   String get languageChineseSimplified => 'Simplified Chinese';
 
   @override

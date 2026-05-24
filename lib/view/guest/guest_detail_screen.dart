@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:pve_manager/core/l10n/l10n_extensions.dart';
@@ -18,11 +19,13 @@ class GuestDetailScreen extends StatefulWidget {
   const GuestDetailScreen({
     required this.client,
     required this.guest,
+    required this.autoRefreshIntervalListenable,
     super.key,
   });
 
   final ProxmoxClient client;
   final PveResource guest;
+  final ValueListenable<Duration> autoRefreshIntervalListenable;
 
   @override
   State<GuestDetailScreen> createState() => _GuestDetailScreenState();
@@ -38,24 +41,45 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
   String _timeframe = 'hour';
 
   static const _timeframes = <String>['hour', 'day', 'week', 'month', 'year'];
-  static const Duration _autoRefreshInterval = Duration(seconds: 5);
 
   @override
   void initState() {
     super.initState();
     _guest = widget.guest;
     _historyFuture = _loadHistory();
-    _refreshTimer = Timer.periodic(_autoRefreshInterval, (_) {
-      if (mounted && (ModalRoute.of(context)?.isCurrent ?? true)) {
-        _refreshData();
-      }
-    });
+    widget.autoRefreshIntervalListenable.addListener(_startRefreshTimer);
+    _startRefreshTimer();
+  }
+
+  @override
+  void didUpdateWidget(GuestDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.autoRefreshIntervalListenable !=
+        widget.autoRefreshIntervalListenable) {
+      oldWidget.autoRefreshIntervalListenable.removeListener(
+        _startRefreshTimer,
+      );
+      widget.autoRefreshIntervalListenable.addListener(_startRefreshTimer);
+      _startRefreshTimer();
+    }
   }
 
   @override
   void dispose() {
+    widget.autoRefreshIntervalListenable.removeListener(_startRefreshTimer);
     _refreshTimer?.cancel();
     super.dispose();
+  }
+
+  void _startRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(widget.autoRefreshIntervalListenable.value, (
+      _,
+    ) {
+      if (mounted && (ModalRoute.of(context)?.isCurrent ?? true)) {
+        _refreshData();
+      }
+    });
   }
 
   Future<List<GuestRrdPoint>> _loadHistory() async {

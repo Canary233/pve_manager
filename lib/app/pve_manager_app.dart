@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 
+import 'package:pve_manager/core/settings/auto_refresh_settings.dart';
+import 'package:pve_manager/data/repositories/app_settings_repository.dart';
 import 'package:pve_manager/l10n/generated/app_localizations.dart';
 import 'package:pve_manager/view/home/home_screen.dart';
 
@@ -14,7 +16,28 @@ class PveManagerApp extends StatefulWidget {
 class _PveManagerAppState extends State<PveManagerApp> {
   static const Locale _chineseLocale = Locale('zh');
 
+  final AppSettingsRepository _settingsRepository =
+      AppSettingsRepository.instance;
+
   Locale _locale = _chineseLocale;
+  final ValueNotifier<Duration> _autoRefreshInterval = ValueNotifier<Duration>(
+    defaultAutoRefreshInterval,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final autoRefreshInterval = await _settingsRepository
+        .getAutoRefreshInterval();
+    if (!mounted) {
+      return;
+    }
+    _autoRefreshInterval.value = autoRefreshInterval;
+  }
 
   void _setLocale(Locale locale) {
     if (_locale == locale) {
@@ -23,6 +46,20 @@ class _PveManagerAppState extends State<PveManagerApp> {
     setState(() {
       _locale = locale;
     });
+  }
+
+  Future<void> _setAutoRefreshInterval(Duration interval) async {
+    if (_autoRefreshInterval.value == interval) {
+      return;
+    }
+    _autoRefreshInterval.value = interval;
+    await _settingsRepository.setAutoRefreshInterval(interval);
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshInterval.dispose();
+    super.dispose();
   }
 
   @override
@@ -50,7 +87,12 @@ class _PveManagerAppState extends State<PveManagerApp> {
           supportedLocales: AppLocalizations.supportedLocales,
           theme: _buildTheme(lightScheme),
           darkTheme: _buildTheme(darkScheme),
-          home: HomeScreen(locale: _locale, onLocaleChanged: _setLocale),
+          home: HomeScreen(
+            locale: _locale,
+            onLocaleChanged: _setLocale,
+            autoRefreshIntervalListenable: _autoRefreshInterval,
+            onAutoRefreshIntervalChanged: _setAutoRefreshInterval,
+          ),
         );
       },
     );

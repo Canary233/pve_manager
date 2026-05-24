@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -9,30 +11,23 @@ import 'package:pve_manager/core/widgets/inline_message.dart';
 import 'package:pve_manager/view/home/widgets/empty_servers.dart';
 import 'package:pve_manager/view/home/widgets/server_card.dart';
 import 'package:pve_manager/view/home/widgets/server_form_dialog.dart';
+import 'package:pve_manager/view/settings/settings_screen.dart';
 
 enum _ServerAction { edit, delete }
-
-class _LanguageOption {
-  const _LanguageOption({
-    required this.locale,
-    required this.label,
-    required this.iconText,
-  });
-
-  final Locale locale;
-  final String label;
-  final String iconText;
-}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     required this.locale,
     required this.onLocaleChanged,
+    required this.autoRefreshIntervalListenable,
+    required this.onAutoRefreshIntervalChanged,
   });
 
   final Locale locale;
   final ValueChanged<Locale> onLocaleChanged;
+  final ValueListenable<Duration> autoRefreshIntervalListenable;
+  final ValueChanged<Duration> onAutoRefreshIntervalChanged;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -41,6 +36,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final List<PveServerConfig> _servers = <PveServerConfig>[];
   final ServerRepository _repository = ServerRepository.instance;
+  Timer? _refreshTimer;
   bool _isInitializing = true;
   bool _isLoading = false;
   String? _connectingOrigin;
@@ -49,7 +45,42 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    widget.autoRefreshIntervalListenable.addListener(_startRefreshTimer);
+    _startRefreshTimer();
     _loadServers();
+  }
+
+  @override
+  void didUpdateWidget(HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.autoRefreshIntervalListenable !=
+        widget.autoRefreshIntervalListenable) {
+      oldWidget.autoRefreshIntervalListenable.removeListener(
+        _startRefreshTimer,
+      );
+      widget.autoRefreshIntervalListenable.addListener(_startRefreshTimer);
+      _startRefreshTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.autoRefreshIntervalListenable.removeListener(_startRefreshTimer);
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(widget.autoRefreshIntervalListenable.value, (
+      _,
+    ) {
+      if (mounted &&
+          !_isLoading &&
+          (ModalRoute.of(context)?.isCurrent ?? true)) {
+        _loadServers();
+      }
+    });
   }
 
   Future<void> _loadServers() async {
@@ -176,34 +207,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _showLanguagePicker() async {
-    final l10n = context.l10n;
-    final selected = await showModalBottomSheet<Locale>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        final options = [
-          _LanguageOption(
-            locale: const Locale('zh'),
-            label: l10n.languageChineseSimplified,
-            iconText: '中',
-          ),
-          _LanguageOption(
-            locale: const Locale('en'),
-            label: l10n.languageEnglish,
-            iconText: 'EN',
-          ),
-        ];
-        return _LanguagePickerSheet(
-          options: options,
-          selectedLocale: widget.locale,
-        );
-      },
+  Future<void> _openSettings() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SettingsScreen(
+          locale: widget.locale,
+          onLocaleChanged: widget.onLocaleChanged,
+          autoRefreshIntervalListenable: widget.autoRefreshIntervalListenable,
+          onAutoRefreshIntervalChanged: widget.onAutoRefreshIntervalChanged,
+        ),
+      ),
     );
-
-    if (selected != null && mounted) {
-      widget.onLocaleChanged(selected);
-    }
   }
 
   Future<void> _connect(PveServerConfig server) async {
@@ -247,8 +261,11 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) =>
-              DashboardScreen(client: client, serverName: server.name),
+          builder: (_) => DashboardScreen(
+            client: client,
+            serverName: server.name,
+            autoRefreshIntervalListenable: widget.autoRefreshIntervalListenable,
+          ),
         ),
       );
     } on Object catch (error) {
@@ -283,9 +300,9 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: false,
         actions: [
           IconButton(
-            tooltip: l10n.switchLanguage,
-            onPressed: _showLanguagePicker,
-            icon: const Icon(Icons.language_rounded),
+            tooltip: l10n.settings,
+            onPressed: _openSettings,
+            icon: const Icon(Icons.settings_rounded),
           ),
         ],
       ),
@@ -344,111 +361,6 @@ class _HomeScreenState extends State<HomeScreen> {
         tooltip: l10n.addServer,
         onPressed: () => _openServerForm(),
         child: const Icon(Icons.add_rounded),
-      ),
-    );
-  }
-}
-
-class _LanguagePickerSheet extends StatelessWidget {
-  const _LanguagePickerSheet({
-    required this.options,
-    required this.selectedLocale,
-  });
-
-  final List<_LanguageOption> options;
-  final Locale selectedLocale;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              context.l10n.switchLanguage,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 14),
-            ...options.map((option) {
-              final selected =
-                  option.locale.languageCode == selectedLocale.languageCode;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Material(
-                  color: selected
-                      ? colorScheme.primaryContainer.withValues(alpha: 0.72)
-                      : colorScheme.surfaceContainerHighest.withValues(
-                          alpha: 0.62,
-                        ),
-                  borderRadius: BorderRadius.circular(14),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () => Navigator.of(context).pop(option.locale),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: selected
-                                  ? colorScheme.primary
-                                  : colorScheme.surface,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              option.iconText,
-                              style: Theme.of(context).textTheme.labelLarge
-                                  ?.copyWith(
-                                    color: selected
-                                        ? colorScheme.onPrimary
-                                        : colorScheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Text(
-                              option.label,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 160),
-                            child: selected
-                                ? Icon(
-                                    Icons.check_circle_rounded,
-                                    key: const ValueKey('selected'),
-                                    color: colorScheme.primary,
-                                  )
-                                : Icon(
-                                    Icons.circle_outlined,
-                                    key: const ValueKey('unselected'),
-                                    color: colorScheme.outline,
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ],
-        ),
       ),
     );
   }

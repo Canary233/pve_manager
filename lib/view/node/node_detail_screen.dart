@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:pve_manager/core/l10n/l10n_extensions.dart';
@@ -16,10 +17,16 @@ import 'package:pve_manager/core/widgets/cpu_history_chart.dart';
 import 'package:pve_manager/view/node/node_tasks_logs_screen.dart';
 
 class NodeDetailScreen extends StatefulWidget {
-  const NodeDetailScreen({required this.client, required this.node, super.key});
+  const NodeDetailScreen({
+    required this.client,
+    required this.node,
+    required this.autoRefreshIntervalListenable,
+    super.key,
+  });
 
   final ProxmoxClient client;
   final PveNode node;
+  final ValueListenable<Duration> autoRefreshIntervalListenable;
 
   @override
   State<NodeDetailScreen> createState() => _NodeDetailScreenState();
@@ -33,23 +40,44 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
   String _timeframe = 'hour';
 
   static const _timeframes = <String>['hour', 'day', 'week', 'month', 'year'];
-  static const Duration _autoRefreshInterval = Duration(seconds: 5);
 
   @override
   void initState() {
     super.initState();
     _detailFuture = _loadDetailTracked();
-    _refreshTimer = Timer.periodic(_autoRefreshInterval, (_) {
-      if (mounted && (ModalRoute.of(context)?.isCurrent ?? true)) {
-        _refresh();
-      }
-    });
+    widget.autoRefreshIntervalListenable.addListener(_startRefreshTimer);
+    _startRefreshTimer();
+  }
+
+  @override
+  void didUpdateWidget(NodeDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.autoRefreshIntervalListenable !=
+        widget.autoRefreshIntervalListenable) {
+      oldWidget.autoRefreshIntervalListenable.removeListener(
+        _startRefreshTimer,
+      );
+      widget.autoRefreshIntervalListenable.addListener(_startRefreshTimer);
+      _startRefreshTimer();
+    }
   }
 
   @override
   void dispose() {
+    widget.autoRefreshIntervalListenable.removeListener(_startRefreshTimer);
     _refreshTimer?.cancel();
     super.dispose();
+  }
+
+  void _startRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(widget.autoRefreshIntervalListenable.value, (
+      _,
+    ) {
+      if (mounted && (ModalRoute.of(context)?.isCurrent ?? true)) {
+        _refresh();
+      }
+    });
   }
 
   Future<_NodeDetailData> _loadDetail() async {

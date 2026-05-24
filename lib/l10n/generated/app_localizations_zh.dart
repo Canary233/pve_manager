@@ -18,6 +18,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get switchLanguage => '切换语言';
 
   @override
+  String get settings => '设置';
+
+  @override
+  String get language => '语言';
+
+  @override
+  String get selectLanguage => '选择语言';
+
+  @override
+  String get autoRefreshInterval => '自动刷新间隔';
+
+  @override
+  String get selectAutoRefreshInterval => '选择自动刷新间隔';
+
+  @override
+  String secondsInterval(int seconds) {
+    return '$seconds 秒';
+  }
+
+  @override
   String get languageChineseSimplified => '简体中文';
 
   @override

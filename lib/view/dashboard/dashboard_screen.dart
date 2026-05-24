@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:pve_manager/core/l10n/l10n_extensions.dart';
+import 'package:pve_manager/data/models/node_status.dart';
 import 'package:pve_manager/data/models/pve_node.dart';
 import 'package:pve_manager/data/models/pve_resource.dart';
 import 'package:pve_manager/data/models/pve_snapshot.dart';
@@ -19,11 +21,13 @@ class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
     required this.client,
     required this.serverName,
+    required this.autoRefreshIntervalListenable,
     super.key,
   });
 
   final ProxmoxClient client;
   final String serverName;
+  final ValueListenable<Duration> autoRefreshIntervalListenable;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -35,24 +39,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isSnapshotLoading = false;
   PveSnapshot? _lastSnapshot;
 
-  static const Duration _autoRefreshInterval = Duration(seconds: 5);
-
   @override
   void initState() {
     super.initState();
     _snapshotFuture = _loadSnapshotTracked();
-    _refreshTimer = Timer.periodic(_autoRefreshInterval, (_) {
-      if (mounted && (ModalRoute.of(context)?.isCurrent ?? true)) {
-        _refreshSnapshot();
-      }
-    });
+    widget.autoRefreshIntervalListenable.addListener(_startRefreshTimer);
+    _startRefreshTimer();
+  }
+
+  @override
+  void didUpdateWidget(DashboardScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.autoRefreshIntervalListenable !=
+        widget.autoRefreshIntervalListenable) {
+      oldWidget.autoRefreshIntervalListenable.removeListener(
+        _startRefreshTimer,
+      );
+      widget.autoRefreshIntervalListenable.addListener(_startRefreshTimer);
+      _startRefreshTimer();
+    }
   }
 
   @override
   void dispose() {
+    widget.autoRefreshIntervalListenable.removeListener(_startRefreshTimer);
     _refreshTimer?.cancel();
     widget.client.close();
     super.dispose();
+  }
+
+  void _startRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(widget.autoRefreshIntervalListenable.value, (
+      _,
+    ) {
+      if (mounted && (ModalRoute.of(context)?.isCurrent ?? true)) {
+        _refreshSnapshot();
+      }
+    });
   }
 
   Future<PveSnapshot> _loadSnapshot() async {
@@ -67,8 +91,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
       resources: results[1] as List<PveResource>,
       clusterStatus: results[2] as Map<String, dynamic>,
     );
-    _lastSnapshot = snapshot;
-    return snapshot;
+    final nodes = await _loadNodeUsage(snapshot.nodes);
+    final snapshotWithNodeUsage = PveSnapshot(
+      nodes: nodes,
+      resources: snapshot.resources,
+      clusterStatus: snapshot.clusterStatus,
+    );
+    _lastSnapshot = snapshotWithNodeUsage;
+    return snapshotWithNodeUsage;
+  }
+
+  Future<List<PveNode>> _loadNodeUsage(List<PveNode> nodes) async {
+    if (nodes.isEmpty) {
+      return nodes;
+    }
+
+    final statuses = await Future.wait<NodeStatus?>(
+      nodes.map((node) async {
+        try {
+          return await widget.client.getNodeStatus(node.name);
+        } on Object {
+          return null;
+        }
+      }),
+    );
+
+    return [
+      for (var index = 0; index < nodes.length; index++)
+        if (statuses[index] case final status?)
+          nodes[index].copyWith(
+            cpu: status.cpu,
+            memoryUsed: status.memoryUsed,
+            memoryTotal: status.memoryTotal,
+          )
+        else
+          nodes[index],
+    ];
   }
 
   Future<PveSnapshot> _loadSnapshotTracked() async {
@@ -100,7 +158,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _openGuest(PveResource guest) async {
     final shouldRefresh = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
-        builder: (_) => GuestDetailScreen(client: widget.client, guest: guest),
+        builder: (_) => GuestDetailScreen(
+          client: widget.client,
+          guest: guest,
+          autoRefreshIntervalListenable: widget.autoRefreshIntervalListenable,
+        ),
       ),
     );
 
@@ -112,7 +174,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _openNode(PveNode node) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => NodeDetailScreen(client: widget.client, node: node),
+        builder: (_) => NodeDetailScreen(
+          client: widget.client,
+          node: node,
+          autoRefreshIntervalListenable: widget.autoRefreshIntervalListenable,
+        ),
       ),
     );
     if (mounted) {

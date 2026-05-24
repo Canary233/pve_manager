@@ -27,4 +27,20 @@ class PveNode {
 
   double get memoryRatio =>
       memoryTotal == 0 ? 0 : (memoryUsed / memoryTotal).clamp(0, 1);
+
+  PveNode copyWith({
+    String? name,
+    String? status,
+    double? cpu,
+    int? memoryUsed,
+    int? memoryTotal,
+  }) {
+    return PveNode(
+      name: name ?? this.name,
+      status: status ?? this.status,
+      cpu: cpu ?? this.cpu,
+      memoryUsed: memoryUsed ?? this.memoryUsed,
+      memoryTotal: memoryTotal ?? this.memoryTotal,
+    );
+  }
 }

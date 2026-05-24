@@ -116,6 +116,42 @@ abstract class AppLocalizations {
   /// **'切换语言'**
   String get switchLanguage;
 
+  /// No description provided for @settings.
+  ///
+  /// In zh, this message translates to:
+  /// **'设置'**
+  String get settings;
+
+  /// No description provided for @language.
+  ///
+  /// In zh, this message translates to:
+  /// **'语言'**
+  String get language;
+
+  /// No description provided for @selectLanguage.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择语言'**
+  String get selectLanguage;
+
+  /// No description provided for @autoRefreshInterval.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动刷新间隔'**
+  String get autoRefreshInterval;
+
+  /// No description provided for @selectAutoRefreshInterval.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择自动刷新间隔'**
+  String get selectAutoRefreshInterval;
+
+  /// No description provided for @secondsInterval.
+  ///
+  /// In zh, this message translates to:
+  /// **'{seconds} 秒'**
+  String secondsInterval(int seconds);
+
   /// No description provided for @languageChineseSimplified.
   ///
   /// In zh, this message translates to:
