@@ -13,30 +13,42 @@ class UsageLine extends StatelessWidget {
   final String text;
 
   static const double _edgeTextWidth = 128;
+  static const double _rightAlignedBreakpoint = 520;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final alignRight = constraints.maxWidth < _rightAlignedBreakpoint;
+
+        return Column(
           children: [
-            SizedBox(
-              width: _edgeTextWidth,
-              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+            Row(
+              children: [
+                SizedBox(
+                  width: alignRight ? null : _edgeTextWidth,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    text,
+                    textAlign: alignRight ? TextAlign.right : TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (!alignRight) const SizedBox(width: _edgeTextWidth),
+              ],
             ),
-            Expanded(
-              child: Text(
-                text,
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: _edgeTextWidth),
+            const SizedBox(height: 5),
+            LinearProgressIndicator(value: value.clamp(0, 1)),
           ],
-        ),
-        const SizedBox(height: 5),
-        LinearProgressIndicator(value: value.clamp(0, 1)),
-      ],
+        );
+      },
     );
   }
 }
