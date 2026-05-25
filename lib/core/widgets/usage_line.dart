@@ -12,20 +12,26 @@ class UsageLine extends StatelessWidget {
   final double value;
   final String text;
 
+  static const double _edgeTextWidth = 128;
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         Row(
           children: [
-            SizedBox(width: 42, child: Text(label)),
+            SizedBox(
+              width: _edgeTextWidth,
+              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
             Expanded(
               child: Text(
                 text,
-                textAlign: TextAlign.right,
+                textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            const SizedBox(width: _edgeTextWidth),
           ],
         ),
         const SizedBox(height: 5),

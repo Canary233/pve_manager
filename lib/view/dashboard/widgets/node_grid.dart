@@ -8,10 +8,16 @@ import 'package:pve_manager/core/widgets/status_pill.dart';
 import 'package:pve_manager/core/widgets/usage_line.dart';
 
 class NodeGrid extends StatelessWidget {
-  const NodeGrid({required this.nodes, required this.onNodeTap, super.key});
+  const NodeGrid({
+    required this.nodes,
+    required this.onNodeTap,
+    this.selectedNodeName,
+    super.key,
+  });
 
   final List<PveNode> nodes;
   final ValueChanged<PveNode> onNodeTap;
+  final String? selectedNodeName;
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +27,7 @@ class NodeGrid extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 760 ? 2 : 1;
+        final columns = nodes.length > 1 && constraints.maxWidth >= 760 ? 2 : 1;
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -34,6 +40,7 @@ class NodeGrid extends StatelessWidget {
           itemCount: nodes.length,
           itemBuilder: (context, index) => _NodeCard(
             node: nodes[index],
+            selected: nodes[index].name == selectedNodeName,
             onTap: () => onNodeTap(nodes[index]),
           ),
         );
@@ -43,15 +50,24 @@ class NodeGrid extends StatelessWidget {
 }
 
 class _NodeCard extends StatelessWidget {
-  const _NodeCard({required this.node, required this.onTap});
+  const _NodeCard({
+    required this.node,
+    required this.selected,
+    required this.onTap,
+  });
 
   final PveNode node;
+  final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: Theme.of(context).colorScheme.surface,
+      color: selected
+          ? Theme.of(
+              context,
+            ).colorScheme.primaryContainer.withValues(alpha: 0.48)
+          : Theme.of(context).colorScheme.surface,
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: onTap,

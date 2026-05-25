@@ -21,12 +21,14 @@ class NodeDetailScreen extends StatefulWidget {
     required this.client,
     required this.node,
     required this.autoRefreshIntervalListenable,
+    this.embedded = false,
     super.key,
   });
 
   final ProxmoxClient client;
   final PveNode node;
   final ValueListenable<Duration> autoRefreshIntervalListenable;
+  final bool embedded;
 
   @override
   State<NodeDetailScreen> createState() => _NodeDetailScreenState();
@@ -241,6 +243,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.embedded,
         title: Text(l10n.nodeDetails),
         actions: [
           IconButton(
@@ -332,15 +335,8 @@ class _SystemInfoCard extends StatelessWidget {
         children: [
           _CardTitle(title: l10n.systemInfo),
           const Divider(height: 24),
-          if (cpuModel != null) ...[
-            Text(
-              l10n.processor(cpuModel),
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 16),
-          ],
+          if (cpuModel != null)
+            _InfoRow(label: l10n.processor, value: cpuModel),
           _InfoRow(
             label: l10n.cpuCores,
             value: l10n.cpuCoresValue(

@@ -74,6 +74,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get back => 'Back';
 
   @override
+  String get close => 'Close';
+
+  @override
   String get power => 'Power';
 
   @override
@@ -204,9 +207,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get memoryHistory => 'Memory usage';
 
   @override
-  String processor(Object model) {
-    return 'Processor $model';
-  }
+  String get processor => 'Processor';
 
   @override
   String get cpuCores => 'CPU cores';

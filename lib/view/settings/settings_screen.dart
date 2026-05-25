@@ -11,12 +11,14 @@ class SettingsScreen extends StatefulWidget {
     required this.onLocaleChanged,
     required this.autoRefreshIntervalListenable,
     required this.onAutoRefreshIntervalChanged,
+    this.embedded = false,
   });
 
   final Locale locale;
   final ValueChanged<Locale> onLocaleChanged;
   final ValueListenable<Duration> autoRefreshIntervalListenable;
   final ValueChanged<Duration> onAutoRefreshIntervalChanged;
+  final bool embedded;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -72,6 +74,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
 
+    final body = SafeArea(
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Card(
+                color: colorScheme.surfaceContainer,
+                child: ListTile(
+                  leading: const Icon(Icons.language_rounded),
+                  title: Text(l10n.language),
+                  subtitle: Text(
+                    _languageName(context, _currentLocale(context)),
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => _showLanguagePicker(context),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                color: colorScheme.surfaceContainer,
+                child: ListTile(
+                  leading: const Icon(Icons.sync_rounded),
+                  title: Text(l10n.autoRefreshInterval),
+                  subtitle: Text(
+                    _refreshIntervalLabel(context, _autoRefreshInterval),
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => _showRefreshIntervalPicker(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (widget.embedded) {
+      return Material(
+        color: colorScheme.surfaceContainerLow,
+        child: Column(
+          children: [
+            SafeArea(
+              bottom: false,
+              child: SizedBox(
+                height: kToolbarHeight,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        l10n.settings,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: l10n.close,
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(child: body),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerLow,
       appBar: AppBar(
@@ -79,44 +154,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         backgroundColor: colorScheme.surfaceContainerLow,
         surfaceTintColor: Colors.transparent,
       ),
-      body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                Card(
-                  color: colorScheme.surfaceContainer,
-                  child: ListTile(
-                    leading: const Icon(Icons.language_rounded),
-                    title: Text(l10n.language),
-                    subtitle: Text(
-                      _languageName(context, _currentLocale(context)),
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => _showLanguagePicker(context),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Card(
-                  color: colorScheme.surfaceContainer,
-                  child: ListTile(
-                    leading: const Icon(Icons.sync_rounded),
-                    title: Text(l10n.autoRefreshInterval),
-                    subtitle: Text(
-                      _refreshIntervalLabel(context, _autoRefreshInterval),
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () => _showRefreshIntervalPicker(context),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      body: body,
     );
   }
 

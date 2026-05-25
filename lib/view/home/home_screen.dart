@@ -15,6 +15,9 @@ import 'package:pve_manager/view/settings/settings_screen.dart';
 
 enum _ServerAction { edit, delete }
 
+const double _settingsSidebarWidth = 400;
+const double _settingsSidebarBreakpoint = 840;
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
@@ -208,6 +211,51 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openSettings() async {
+    if (MediaQuery.sizeOf(context).width >= _settingsSidebarBreakpoint) {
+      await showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: MaterialLocalizations.of(
+          context,
+        ).modalBarrierDismissLabel,
+        barrierColor: Colors.black.withValues(alpha: 0.24),
+        transitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              width: _settingsSidebarWidth,
+              height: double.infinity,
+              child: SettingsScreen(
+                locale: widget.locale,
+                onLocaleChanged: widget.onLocaleChanged,
+                autoRefreshIntervalListenable:
+                    widget.autoRefreshIntervalListenable,
+                onAutoRefreshIntervalChanged:
+                    widget.onAutoRefreshIntervalChanged,
+                embedded: true,
+              ),
+            ),
+          );
+        },
+        transitionBuilder: (context, animation, secondaryAnimation, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(1, 0),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          );
+        },
+      );
+      return;
+    }
+
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => SettingsScreen(

@@ -224,6 +224,12 @@ abstract class AppLocalizations {
   /// **'返回'**
   String get back;
 
+  /// No description provided for @close.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭'**
+  String get close;
+
   /// No description provided for @power.
   ///
   /// In zh, this message translates to:
@@ -473,8 +479,8 @@ abstract class AppLocalizations {
   /// No description provided for @processor.
   ///
   /// In zh, this message translates to:
-  /// **'处理器 {model}'**
-  String processor(Object model);
+  /// **'处理器'**
+  String get processor;
 
   /// No description provided for @cpuCores.
   ///

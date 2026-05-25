@@ -74,6 +74,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get back => '返回';
 
   @override
+  String get close => '关闭';
+
+  @override
   String get power => '电源';
 
   @override
@@ -203,9 +206,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get memoryHistory => '内存使用量';
 
   @override
-  String processor(Object model) {
-    return '处理器 $model';
-  }
+  String get processor => '处理器';
 
   @override
   String get cpuCores => 'CPU 核心';

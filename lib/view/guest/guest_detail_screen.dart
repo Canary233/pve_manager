@@ -20,12 +20,16 @@ class GuestDetailScreen extends StatefulWidget {
     required this.client,
     required this.guest,
     required this.autoRefreshIntervalListenable,
+    this.embedded = false,
+    this.onActionCompleted,
     super.key,
   });
 
   final ProxmoxClient client;
   final PveResource guest;
   final ValueListenable<Duration> autoRefreshIntervalListenable;
+  final bool embedded;
+  final VoidCallback? onActionCompleted;
 
   @override
   State<GuestDetailScreen> createState() => _GuestDetailScreenState();
@@ -198,7 +202,12 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
           ),
         ),
       );
-      Navigator.of(context).pop(true);
+      if (widget.embedded) {
+        widget.onActionCompleted?.call();
+        await _refreshData();
+      } else {
+        Navigator.of(context).pop(true);
+      }
     } on Object catch (error) {
       if (!mounted) {
         return;
@@ -222,6 +231,7 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.embedded,
         title: Text(guest.name),
         actions: [
           IconButton(

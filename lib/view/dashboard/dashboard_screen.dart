@@ -34,10 +34,13 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  static const double _splitLayoutWidth = 840;
+
   late Future<PveSnapshot> _snapshotFuture;
   Timer? _refreshTimer;
   bool _isSnapshotLoading = false;
   PveSnapshot? _lastSnapshot;
+  _DashboardSelection? _selection;
 
   @override
   void initState() {
@@ -155,7 +158,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Future<void> _openGuest(PveResource guest) async {
+  void _selectGuest(PveResource guest) {
+    setState(() {
+      _selection = _DashboardSelection.guest(guest.id);
+    });
+  }
+
+  Future<void> _openGuestRoute(PveResource guest) async {
     final shouldRefresh = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => GuestDetailScreen(
@@ -171,7 +180,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Future<void> _openNode(PveNode node) async {
+  void _selectNode(PveNode node) {
+    setState(() {
+      _selection = _DashboardSelection.node(node.name);
+    });
+  }
+
+  Future<void> _openNodeRoute(PveNode node) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => NodeDetailScreen(
@@ -215,37 +230,267 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final storages = snapshotData.resources
               .where((item) => item.type == 'storage')
               .toList();
+          final useSplitLayout =
+              MediaQuery.sizeOf(context).width >= _splitLayoutWidth;
 
-          return RefreshIndicator(
+          if (useSplitLayout) {
+            return _DashboardSplitLayout(
+              snapshot: snapshotData,
+              guests: guests,
+              storages: storages,
+              selection: _effectiveSelection(snapshotData.nodes, guests),
+              onRefresh: _refreshSnapshot,
+              onNodeTap: _selectNode,
+              onGuestTap: _selectGuest,
+              detailBuilder: _buildSplitDetail,
+            );
+          }
+
+          return _DashboardList(
+            snapshot: snapshotData,
+            guests: guests,
+            storages: storages,
             onRefresh: _refreshSnapshot,
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                SectionHeader(
-                  title: l10n.nodes,
-                  trailing: l10n.nodesCount(snapshotData.nodes.length),
-                ),
-                const SizedBox(height: 8),
-                NodeGrid(nodes: snapshotData.nodes, onNodeTap: _openNode),
-                const SizedBox(height: 16),
-                SectionHeader(
-                  title: l10n.guests,
-                  trailing: l10n.itemsCount(guests.length),
-                ),
-                const SizedBox(height: 8),
-                GuestPanel(guests: guests, onSelect: _openGuest),
-                const SizedBox(height: 16),
-                SectionHeader(
-                  title: l10n.storage,
-                  trailing: l10n.itemsCount(storages.length),
-                ),
-                const SizedBox(height: 8),
-                StorageList(storages: storages),
-              ],
-            ),
+            onNodeTap: _openNodeRoute,
+            onGuestTap: _openGuestRoute,
           );
         },
       ),
+    );
+  }
+
+  _DashboardSelection? _effectiveSelection(
+    List<PveNode> nodes,
+    List<PveResource> guests,
+  ) {
+    final selection = _selection;
+    if (selection != null) {
+      switch (selection.type) {
+        case _DashboardSelectionType.node:
+          if (nodes.any((node) => node.name == selection.id)) {
+            return selection;
+          }
+        case _DashboardSelectionType.guest:
+          if (guests.any((guest) => guest.id == selection.id)) {
+            return selection;
+          }
+      }
+    }
+
+    if (nodes.isNotEmpty) {
+      return _DashboardSelection.node(nodes.first.name);
+    }
+    if (guests.isNotEmpty) {
+      return _DashboardSelection.guest(guests.first.id);
+    }
+    return null;
+  }
+
+  Widget _buildSplitDetail(
+    BuildContext context,
+    _DashboardSelection? selection,
+    List<PveNode> nodes,
+    List<PveResource> guests,
+  ) {
+    if (selection == null) {
+      return const SizedBox.shrink();
+    }
+
+    switch (selection.type) {
+      case _DashboardSelectionType.node:
+        final node = _findNode(nodes, selection.id);
+        if (node == null) {
+          return const SizedBox.shrink();
+        }
+        return NodeDetailScreen(
+          key: ValueKey('node-detail-${node.name}'),
+          client: widget.client,
+          node: node,
+          autoRefreshIntervalListenable: widget.autoRefreshIntervalListenable,
+          embedded: true,
+        );
+      case _DashboardSelectionType.guest:
+        final guest = _findGuest(guests, selection.id);
+        if (guest == null) {
+          return const SizedBox.shrink();
+        }
+        return GuestDetailScreen(
+          key: ValueKey('guest-detail-${guest.id}'),
+          client: widget.client,
+          guest: guest,
+          autoRefreshIntervalListenable: widget.autoRefreshIntervalListenable,
+          embedded: true,
+          onActionCompleted: _refreshSnapshot,
+        );
+    }
+  }
+
+  PveNode? _findNode(List<PveNode> nodes, String name) {
+    for (final node in nodes) {
+      if (node.name == name) {
+        return node;
+      }
+    }
+    return null;
+  }
+
+  PveResource? _findGuest(List<PveResource> guests, String id) {
+    for (final guest in guests) {
+      if (guest.id == id) {
+        return guest;
+      }
+    }
+    return null;
+  }
+}
+
+enum _DashboardSelectionType { node, guest }
+
+class _DashboardSelection {
+  const _DashboardSelection._(this.type, this.id);
+
+  const _DashboardSelection.node(String name)
+    : this._(_DashboardSelectionType.node, name);
+
+  const _DashboardSelection.guest(String id)
+    : this._(_DashboardSelectionType.guest, id);
+
+  final _DashboardSelectionType type;
+  final String id;
+}
+
+class _DashboardList extends StatelessWidget {
+  const _DashboardList({
+    required this.snapshot,
+    required this.guests,
+    required this.storages,
+    required this.onRefresh,
+    required this.onNodeTap,
+    required this.onGuestTap,
+    this.selection,
+  });
+
+  final PveSnapshot snapshot;
+  final List<PveResource> guests;
+  final List<PveResource> storages;
+  final RefreshCallback onRefresh;
+  final ValueChanged<PveNode> onNodeTap;
+  final ValueChanged<PveResource> onGuestTap;
+  final _DashboardSelection? selection;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          SectionHeader(
+            title: l10n.nodes,
+            trailing: l10n.nodesCount(snapshot.nodes.length),
+          ),
+          const SizedBox(height: 8),
+          NodeGrid(
+            nodes: snapshot.nodes,
+            onNodeTap: onNodeTap,
+            selectedNodeName: selection?.type == _DashboardSelectionType.node
+                ? selection?.id
+                : null,
+          ),
+          const SizedBox(height: 16),
+          SectionHeader(
+            title: l10n.guests,
+            trailing: l10n.itemsCount(guests.length),
+          ),
+          const SizedBox(height: 8),
+          GuestPanel(
+            guests: guests,
+            onSelect: onGuestTap,
+            selectedGuestId: selection?.type == _DashboardSelectionType.guest
+                ? selection?.id
+                : null,
+          ),
+          const SizedBox(height: 16),
+          SectionHeader(
+            title: l10n.storage,
+            trailing: l10n.itemsCount(storages.length),
+          ),
+          const SizedBox(height: 8),
+          StorageList(storages: storages),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardSplitLayout extends StatelessWidget {
+  const _DashboardSplitLayout({
+    required this.snapshot,
+    required this.guests,
+    required this.storages,
+    required this.selection,
+    required this.onRefresh,
+    required this.onNodeTap,
+    required this.onGuestTap,
+    required this.detailBuilder,
+  });
+
+  final PveSnapshot snapshot;
+  final List<PveResource> guests;
+  final List<PveResource> storages;
+  final _DashboardSelection? selection;
+  final RefreshCallback onRefresh;
+  final ValueChanged<PveNode> onNodeTap;
+  final ValueChanged<PveResource> onGuestTap;
+  final Widget Function(
+    BuildContext context,
+    _DashboardSelection? selection,
+    List<PveNode> nodes,
+    List<PveResource> guests,
+  )
+  detailBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final masterWidth = (constraints.maxWidth * 0.38)
+            .clamp(360.0, 520.0)
+            .toDouble();
+
+        return Row(
+          children: [
+            SizedBox(
+              width: masterWidth,
+              child: _DashboardList(
+                snapshot: snapshot,
+                guests: guests,
+                storages: storages,
+                onRefresh: onRefresh,
+                onNodeTap: onNodeTap,
+                onGuestTap: onGuestTap,
+                selection: selection,
+              ),
+            ),
+            const VerticalDivider(width: 1),
+            Expanded(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
+                ),
+                child: detailBuilder(
+                  context,
+                  selection,
+                  snapshot.nodes,
+                  guests,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

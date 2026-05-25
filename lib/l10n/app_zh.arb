@@ -28,6 +28,7 @@
   "retry": "重试",
   "refresh": "刷新",
   "back": "返回",
+  "close": "关闭",
   "power": "电源",
   "terminal": "终端",
   "tasksAndLogs": "任务和日志",
@@ -88,12 +89,7 @@
   "resourceUsage": "资源使用情况",
   "cpuUsage": "CPU 使用率",
   "memoryHistory": "内存使用量",
-  "processor": "处理器 {model}",
-  "@processor": {
-    "placeholders": {
-      "model": {}
-    }
-  },
+  "processor": "处理器",
   "cpuCores": "CPU 核心",
   "cpuCoresValue": "{cpus}核 {sockets}插槽",
   "@cpuCoresValue": {
