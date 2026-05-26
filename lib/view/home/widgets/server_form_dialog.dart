@@ -104,35 +104,40 @@ class _ServerFormDialogState extends State<ServerFormDialog> {
                   validator: (value) => validateOrigin(l10n, value),
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: TextFormField(
-                        controller: _userController,
-                        decoration: InputDecoration(
-                          labelText: l10n.username,
-                          prefixIcon: const Icon(Icons.person_rounded),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final realmWidth = constraints.maxWidth < 360 ? 92.0 : 96.0;
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _userController,
+                            decoration: InputDecoration(
+                              labelText: l10n.username,
+                              prefixIcon: const Icon(Icons.person_rounded),
+                            ),
+                            textInputAction: TextInputAction.next,
+                            validator: (value) =>
+                                requiredField(value, l10n.enterUsername),
+                          ),
                         ),
-                        textInputAction: TextInputAction.next,
-                        validator: (value) =>
-                            requiredField(value, l10n.enterUsername),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _RealmSelector(
-                        label: l10n.realm,
-                        value: _realm,
-                        options: _realmOptions,
-                        onChanged: (value) {
-                          setState(() {
-                            _realm = value;
-                          });
-                        },
-                      ),
-                    ),
-                  ],
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: realmWidth,
+                          child: _RealmSelector(
+                            label: l10n.realm,
+                            value: _realm,
+                            options: _realmOptions,
+                            onChanged: (value) {
+                              setState(() {
+                                _realm = value;
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -239,16 +244,15 @@ class _RealmSelector extends StatelessWidget {
         child: SizedBox(
           height: 24,
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: colorScheme.onSurface,
-                    fontWeight: FontWeight.w700,
-                  ),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: colorScheme.onSurface,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(width: 4),

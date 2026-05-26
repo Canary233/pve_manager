@@ -69,7 +69,7 @@
   "diskIo": "Disk I/O",
   "processor": "Processor",
   "cpuCores": "CPU cores",
-  "cpuCoresValue": "{cpus} cores {sockets} sockets",
+  "cpuCoresValue": "{cores} cores {threads} threads {sockets} sockets",
   "pveVersion": "PVE version",
   "kernelVersion": "Kernel version",
   "uptime": "Uptime",

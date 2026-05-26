@@ -71,6 +71,7 @@ class NodeStatus {
 
 class CpuInfo {
   const CpuInfo({
+    required this.cores,
     required this.cpus,
     required this.sockets,
     this.model,
@@ -79,10 +80,11 @@ class CpuInfo {
 
   factory CpuInfo.fromJson(Map<String, dynamic> json) {
     if (json.isEmpty) {
-      return const CpuInfo(cpus: 0, sockets: 0);
+      return const CpuInfo(cores: 0, cpus: 0, sockets: 0);
     }
 
     return CpuInfo(
+      cores: asInt(json['cores']),
       cpus: asInt(json['cpus']),
       sockets: asInt(json['sockets']),
       model: json['model']?.toString(),
@@ -90,6 +92,7 @@ class CpuInfo {
     );
   }
 
+  final int cores;
   final int cpus;
   final int sockets;
   final String? model;

@@ -515,8 +515,8 @@ abstract class AppLocalizations {
   /// No description provided for @cpuCoresValue.
   ///
   /// In zh, this message translates to:
-  /// **'{cpus}核 {sockets}插槽'**
-  String cpuCoresValue(int cpus, int sockets);
+  /// **'{cores}核心 {threads}线程 {sockets}插槽'**
+  String cpuCoresValue(int cores, int threads, int sockets);
 
   /// No description provided for @pveVersion.
   ///

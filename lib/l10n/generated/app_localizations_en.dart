@@ -227,8 +227,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cpuCores => 'CPU cores';
 
   @override
-  String cpuCoresValue(int cpus, int sockets) {
-    return '$cpus cores $sockets sockets';
+  String cpuCoresValue(int cores, int threads, int sockets) {
+    return '$cores cores $threads threads $sockets sockets';
   }
 
   @override

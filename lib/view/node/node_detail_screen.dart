@@ -356,6 +356,7 @@ class _SystemInfoCard extends StatelessWidget {
           _InfoRow(
             label: l10n.cpuCores,
             value: l10n.cpuCoresValue(
+              cpuInfo?.cores ?? 0,
               cpuInfo?.cpus ?? 0,
               cpuInfo?.sockets ?? 0,
             ),
@@ -504,12 +505,16 @@ class _InfoRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w700,
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           const SizedBox(width: 16),

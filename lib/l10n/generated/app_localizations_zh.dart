@@ -226,8 +226,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cpuCores => 'CPU 核心';
 
   @override
-  String cpuCoresValue(int cpus, int sockets) {
-    return '$cpus核 $sockets插槽';
+  String cpuCoresValue(int cores, int threads, int sockets) {
+    return '$cores核心 $threads线程 $sockets插槽';
   }
 
   @override

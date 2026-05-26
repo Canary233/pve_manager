@@ -100,10 +100,13 @@
   "diskIo": "磁盘 IO",
   "processor": "处理器",
   "cpuCores": "CPU 核心",
-  "cpuCoresValue": "{cpus}核 {sockets}插槽",
+  "cpuCoresValue": "{cores}核心 {threads}线程 {sockets}插槽",
   "@cpuCoresValue": {
     "placeholders": {
-      "cpus": {
+      "cores": {
+        "type": "int"
+      },
+      "threads": {
         "type": "int"
       },
       "sockets": {
