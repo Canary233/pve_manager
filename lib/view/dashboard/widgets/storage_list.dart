@@ -7,12 +7,21 @@ import 'package:pve_manager/core/widgets/empty_state.dart';
 import 'package:pve_manager/core/widgets/usage_line.dart';
 
 class StorageList extends StatelessWidget {
-  const StorageList({required this.storages, super.key});
+  const StorageList({
+    required this.storages,
+    required this.permissionDenied,
+    super.key,
+  });
 
   final List<PveResource> storages;
+  final bool permissionDenied;
 
   @override
   Widget build(BuildContext context) {
+    if (permissionDenied) {
+      return EmptyState(text: context.l10n.noPermission);
+    }
+
     if (storages.isEmpty) {
       return EmptyState(text: context.l10n.noStorage);
     }

@@ -127,8 +127,12 @@ class ProxmoxClient {
     }
   }
 
-  Future<List<PveResource>> getResources() async {
-    final response = await _request('GET', '/cluster/resources');
+  Future<List<PveResource>> getResources({String? type}) async {
+    final response = await _request(
+      'GET',
+      '/cluster/resources',
+      queryParameters: type == null ? null : {'type': type},
+    );
     final data = response['data'];
 
     if (data is! List) {
@@ -173,6 +177,11 @@ class ProxmoxClient {
     }
 
     return <String, dynamic>{};
+  }
+
+  Future<bool> canReadStorageConfig() async {
+    await _request('GET', '/storage');
+    return true;
   }
 
   Future<NodeStatus> getNodeStatus(String node) async {

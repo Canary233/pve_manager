@@ -7,6 +7,7 @@ class PveNode {
     required this.cpu,
     required this.memoryUsed,
     required this.memoryTotal,
+    this.hasDetailPermission = true,
   });
 
   factory PveNode.fromJson(Map<String, dynamic> json) {
@@ -24,6 +25,7 @@ class PveNode {
   final double cpu;
   final int memoryUsed;
   final int memoryTotal;
+  final bool hasDetailPermission;
 
   double get memoryRatio =>
       memoryTotal == 0 ? 0 : (memoryUsed / memoryTotal).clamp(0, 1);
@@ -34,6 +36,7 @@ class PveNode {
     double? cpu,
     int? memoryUsed,
     int? memoryTotal,
+    bool? hasDetailPermission,
   }) {
     return PveNode(
       name: name ?? this.name,
@@ -41,6 +44,7 @@ class PveNode {
       cpu: cpu ?? this.cpu,
       memoryUsed: memoryUsed ?? this.memoryUsed,
       memoryTotal: memoryTotal ?? this.memoryTotal,
+      hasDetailPermission: hasDetailPermission ?? this.hasDetailPermission,
     );
   }
 }

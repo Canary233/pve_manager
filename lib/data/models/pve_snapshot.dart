@@ -6,11 +6,15 @@ class PveSnapshot {
     required this.nodes,
     required this.resources,
     required this.clusterStatus,
+    this.nodePermissionDenied = false,
+    this.storagePermissionDenied = false,
   });
 
   final List<PveNode> nodes;
   final List<PveResource> resources;
   final Map<String, dynamic> clusterStatus;
+  final bool nodePermissionDenied;
+  final bool storagePermissionDenied;
 
   int get runningGuests => resources
       .where((item) => item.isGuest && item.status == 'running')

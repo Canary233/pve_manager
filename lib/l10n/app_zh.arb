@@ -84,6 +84,7 @@
   "noNodes": "没有读取到节点。",
   "noGuests": "没有读取到虚拟机或容器。",
   "noStorage": "没有读取到存储资源。",
+  "noPermission": "无权限",
   "nodeDetails": "节点详情",
   "systemInfo": "系统信息",
   "resourceUsage": "资源使用情况",

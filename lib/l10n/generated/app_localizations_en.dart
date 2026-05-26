@@ -192,6 +192,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noStorage => 'No storage resources found.';
 
   @override
+  String get noPermission => 'No permission';
+
+  @override
   String get nodeDetails => 'Node details';
 
   @override

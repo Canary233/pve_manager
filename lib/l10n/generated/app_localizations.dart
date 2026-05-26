@@ -446,6 +446,12 @@ abstract class AppLocalizations {
   /// **'没有读取到存储资源。'**
   String get noStorage;
 
+  /// No description provided for @noPermission.
+  ///
+  /// In zh, this message translates to:
+  /// **'无权限'**
+  String get noPermission;
+
   /// No description provided for @nodeDetails.
   ///
   /// In zh, this message translates to:

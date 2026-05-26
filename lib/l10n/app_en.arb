@@ -58,6 +58,7 @@
   "noNodes": "No nodes found.",
   "noGuests": "No VMs or containers found.",
   "noStorage": "No storage resources found.",
+  "noPermission": "No permission",
   "nodeDetails": "Node details",
   "systemInfo": "System information",
   "resourceUsage": "Resource usage",

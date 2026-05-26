@@ -191,6 +191,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get noStorage => '没有读取到存储资源。';
 
   @override
+  String get noPermission => '无权限';
+
+  @override
   String get nodeDetails => '节点详情';
 
   @override

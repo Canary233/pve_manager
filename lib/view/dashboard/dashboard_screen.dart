@@ -9,6 +9,7 @@ import 'package:pve_manager/data/models/pve_node.dart';
 import 'package:pve_manager/data/models/pve_resource.dart';
 import 'package:pve_manager/data/models/pve_snapshot.dart';
 import 'package:pve_manager/data/services/proxmox_client.dart';
+import 'package:pve_manager/data/services/proxmox_api_exception.dart';
 import 'package:pve_manager/core/widgets/error_state.dart';
 import 'package:pve_manager/view/guest/guest_detail_screen.dart';
 import 'package:pve_manager/view/dashboard/widgets/guest_panel.dart';
@@ -83,36 +84,119 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<PveSnapshot> _loadSnapshot() async {
-    final results = await Future.wait<Object>([
-      widget.client.getNodes(),
-      widget.client.getResources(),
-      widget.client.getClusterStatus(),
-    ]);
+    final resourcesResult = await _loadResources();
+    final resources = resourcesResult.resources;
+    final nodesResult = await _loadNodes();
+    final baseNodes = nodesResult.nodes;
+    final clusterStatus = await _loadClusterStatus();
+    final storagePermissionDenied = resourcesResult.fullResourceAccessDenied
+        ? await _isStoragePermissionDenied()
+        : false;
 
     final snapshot = PveSnapshot(
-      nodes: results[0] as List<PveNode>,
-      resources: results[1] as List<PveResource>,
-      clusterStatus: results[2] as Map<String, dynamic>,
+      nodes: baseNodes,
+      resources: resources,
+      clusterStatus: clusterStatus,
+      nodePermissionDenied: nodesResult.permissionDenied,
+      storagePermissionDenied: storagePermissionDenied,
     );
-    final nodes = await _loadNodeUsage(snapshot.nodes);
+    final loadedNodes = await _loadNodeUsage(
+      snapshot.nodes,
+      skipStatusRequests: nodesResult.permissionDenied,
+    );
     final snapshotWithNodeUsage = PveSnapshot(
-      nodes: nodes,
+      nodes: loadedNodes,
       resources: snapshot.resources,
       clusterStatus: snapshot.clusterStatus,
+      nodePermissionDenied: snapshot.nodePermissionDenied,
+      storagePermissionDenied: snapshot.storagePermissionDenied,
     );
     _lastSnapshot = snapshotWithNodeUsage;
     return snapshotWithNodeUsage;
   }
 
-  Future<List<PveNode>> _loadNodeUsage(List<PveNode> nodes) async {
+  Future<_ResourcesLoadResult> _loadResources() async {
+    try {
+      return _ResourcesLoadResult(
+        resources: await widget.client.getResources(),
+        fullResourceAccessDenied: false,
+      );
+    } on ProxmoxApiException catch (error) {
+      if (!_isPermissionError(error)) {
+        rethrow;
+      }
+      return _ResourcesLoadResult(
+        resources: await widget.client.getResources(type: 'vm'),
+        fullResourceAccessDenied: true,
+      );
+    }
+  }
+
+  Future<_NodesLoadResult> _loadNodes() async {
+    try {
+      return _NodesLoadResult(
+        nodes: await widget.client.getNodes(),
+        permissionDenied: false,
+      );
+    } on ProxmoxApiException catch (error) {
+      if (!_isPermissionError(error)) {
+        rethrow;
+      }
+      return const _NodesLoadResult(nodes: <PveNode>[], permissionDenied: true);
+    }
+  }
+
+  Future<Map<String, dynamic>> _loadClusterStatus() async {
+    try {
+      return await widget.client.getClusterStatus();
+    } on ProxmoxApiException catch (error) {
+      if (!_isPermissionError(error)) {
+        rethrow;
+      }
+      return <String, dynamic>{};
+    }
+  }
+
+  bool _isPermissionError(ProxmoxApiException error) {
+    return error.message?.toLowerCase().contains('permission check failed') ??
+        false;
+  }
+
+  Future<bool> _isStoragePermissionDenied() async {
+    try {
+      await widget.client.canReadStorageConfig();
+      return false;
+    } on ProxmoxApiException catch (error) {
+      if (!_isPermissionError(error)) {
+        return false;
+      }
+      return true;
+    }
+  }
+
+  Future<List<PveNode>> _loadNodeUsage(
+    List<PveNode> nodes, {
+    required bool skipStatusRequests,
+  }) async {
     if (nodes.isEmpty) {
       return nodes;
+    }
+
+    if (skipStatusRequests) {
+      return [
+        for (final node in nodes) node.copyWith(hasDetailPermission: false),
+      ];
     }
 
     final statuses = await Future.wait<NodeStatus?>(
       nodes.map((node) async {
         try {
           return await widget.client.getNodeStatus(node.name);
+        } on ProxmoxApiException catch (error) {
+          if (_isPermissionError(error)) {
+            return null;
+          }
+          return null;
         } on Object {
           return null;
         }
@@ -126,9 +210,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             cpu: status.cpu,
             memoryUsed: status.memoryUsed,
             memoryTotal: status.memoryTotal,
+            hasDetailPermission: true,
           )
         else
-          nodes[index],
+          nodes[index].copyWith(hasDetailPermission: false),
     ];
   }
 
@@ -181,12 +266,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _selectNode(PveNode node) {
+    if (!node.hasDetailPermission) {
+      return;
+    }
     setState(() {
       _selection = _DashboardSelection.node(node.name);
     });
   }
 
   Future<void> _openNodeRoute(PveNode node) async {
+    if (!node.hasDetailPermission) {
+      return;
+    }
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => NodeDetailScreen(
@@ -267,7 +358,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (selection != null) {
       switch (selection.type) {
         case _DashboardSelectionType.node:
-          if (nodes.any((node) => node.name == selection.id)) {
+          if (nodes.any(
+            (node) => node.name == selection.id && node.hasDetailPermission,
+          )) {
             return selection;
           }
         case _DashboardSelectionType.guest:
@@ -277,8 +370,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
 
-    if (nodes.isNotEmpty) {
-      return _DashboardSelection.node(nodes.first.name);
+    final accessibleNodes = nodes.where((node) => node.hasDetailPermission);
+    if (accessibleNodes.isNotEmpty) {
+      return _DashboardSelection.node(accessibleNodes.first.name);
     }
     if (guests.isNotEmpty) {
       return _DashboardSelection.guest(guests.first.id);
@@ -299,7 +393,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     switch (selection.type) {
       case _DashboardSelectionType.node:
         final node = _findNode(nodes, selection.id);
-        if (node == null) {
+        if (node == null || !node.hasDetailPermission) {
           return const SizedBox.shrink();
         }
         return NodeDetailScreen(
@@ -394,6 +488,7 @@ class _DashboardList extends StatelessWidget {
           const SizedBox(height: 8),
           NodeGrid(
             nodes: snapshot.nodes,
+            permissionDenied: snapshot.nodePermissionDenied,
             onNodeTap: onNodeTap,
             selectedNodeName: selection?.type == _DashboardSelectionType.node
                 ? selection?.id
@@ -418,11 +513,31 @@ class _DashboardList extends StatelessWidget {
             trailing: l10n.itemsCount(storages.length),
           ),
           const SizedBox(height: 8),
-          StorageList(storages: storages),
+          StorageList(
+            storages: storages,
+            permissionDenied: snapshot.storagePermissionDenied,
+          ),
         ],
       ),
     );
   }
+}
+
+class _ResourcesLoadResult {
+  const _ResourcesLoadResult({
+    required this.resources,
+    required this.fullResourceAccessDenied,
+  });
+
+  final List<PveResource> resources;
+  final bool fullResourceAccessDenied;
+}
+
+class _NodesLoadResult {
+  const _NodesLoadResult({required this.nodes, required this.permissionDenied});
+
+  final List<PveNode> nodes;
+  final bool permissionDenied;
 }
 
 class _DashboardSplitLayout extends StatelessWidget {

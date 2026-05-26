@@ -10,17 +10,23 @@ import 'package:pve_manager/core/widgets/usage_line.dart';
 class NodeGrid extends StatelessWidget {
   const NodeGrid({
     required this.nodes,
+    required this.permissionDenied,
     required this.onNodeTap,
     this.selectedNodeName,
     super.key,
   });
 
   final List<PveNode> nodes;
+  final bool permissionDenied;
   final ValueChanged<PveNode> onNodeTap;
   final String? selectedNodeName;
 
   @override
   Widget build(BuildContext context) {
+    if (permissionDenied) {
+      return EmptyState(text: context.l10n.noPermission);
+    }
+
     if (nodes.isEmpty) {
       return EmptyState(text: context.l10n.noNodes);
     }
@@ -62,6 +68,10 @@ class _NodeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final hasPermission = node.hasDetailPermission;
+    final onSurfaceVariant = Theme.of(context).colorScheme.onSurfaceVariant;
+
     return Card(
       color: selected
           ? Theme.of(
@@ -70,7 +80,7 @@ class _NodeCard extends StatelessWidget {
           : Theme.of(context).colorScheme.surface,
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
+        onTap: hasPermission ? onTap : null,
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -87,21 +97,29 @@ class _NodeCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  StatusPill(status: node.status),
-                  const SizedBox(width: 6),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                  if (hasPermission)
+                    StatusPill(status: node.status)
+                  else
+                    StatusPill(status: 'permissionDenied'),
+                  if (hasPermission) ...[
+                    const SizedBox(width: 6),
+                    Icon(Icons.chevron_right_rounded, color: onSurfaceVariant),
+                  ],
                 ],
               ),
               const Spacer(),
-              UsageLine(label: 'CPU', value: node.cpu, text: percent(node.cpu)),
+              UsageLine(
+                label: 'CPU',
+                value: node.cpu,
+                text: hasPermission ? percent(node.cpu) : l10n.noPermission,
+              ),
               const SizedBox(height: 10),
               UsageLine(
-                label: context.l10n.memory,
+                label: l10n.memory,
                 value: node.memoryRatio,
-                text: '${bytes(node.memoryUsed)} / ${bytes(node.memoryTotal)}',
+                text: hasPermission
+                    ? '${bytes(node.memoryUsed)} / ${bytes(node.memoryTotal)}'
+                    : l10n.noPermission,
               ),
             ],
           ),

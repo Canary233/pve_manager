@@ -47,6 +47,7 @@ String localizedStatus(AppLocalizations l10n, String status) {
     'online' => l10n.online,
     'running' => l10n.running,
     'stopped' => l10n.stopped,
+    'permissionDenied' => l10n.noPermission,
     _ => status,
   };
 }

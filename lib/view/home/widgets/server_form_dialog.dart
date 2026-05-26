@@ -14,12 +14,14 @@ class ServerFormDialog extends StatefulWidget {
 }
 
 class _ServerFormDialogState extends State<ServerFormDialog> {
+  static const _realmOptions = ['pam', 'pve'];
+
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _hostController;
   late final TextEditingController _userController;
   late final TextEditingController _passwordController;
-  late final TextEditingController _realmController;
+  late String _realm;
   late bool _ignoreCertificateErrors;
 
   @override
@@ -30,7 +32,7 @@ class _ServerFormDialogState extends State<ServerFormDialog> {
     _hostController = TextEditingController(text: server?.origin ?? 'https://');
     _userController = TextEditingController(text: server?.username ?? 'root');
     _passwordController = TextEditingController(text: server?.password ?? '');
-    _realmController = TextEditingController(text: server?.realm ?? 'pam');
+    _realm = _realmOptions.contains(server?.realm) ? server!.realm : 'pam';
     _ignoreCertificateErrors = server?.ignoreCertificateErrors ?? true;
   }
 
@@ -40,7 +42,6 @@ class _ServerFormDialogState extends State<ServerFormDialog> {
     _hostController.dispose();
     _userController.dispose();
     _passwordController.dispose();
-    _realmController.dispose();
     super.dispose();
   }
 
@@ -60,7 +61,7 @@ class _ServerFormDialogState extends State<ServerFormDialog> {
         origin: origin,
         username: _userController.text.trim(),
         password: _passwordController.text,
-        realm: _realmController.text.trim(),
+        realm: _realm,
         ignoreCertificateErrors: _ignoreCertificateErrors,
       ),
     );
@@ -120,12 +121,15 @@ class _ServerFormDialogState extends State<ServerFormDialog> {
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: TextFormField(
-                        controller: _realmController,
-                        decoration: InputDecoration(labelText: l10n.realm),
-                        textInputAction: TextInputAction.next,
-                        validator: (value) =>
-                            requiredField(value, l10n.enterRealm),
+                      child: _RealmSelector(
+                        label: l10n.realm,
+                        value: _realm,
+                        options: _realmOptions,
+                        onChanged: (value) {
+                          setState(() {
+                            _realm = value;
+                          });
+                        },
                       ),
                     ),
                   ],
@@ -168,6 +172,95 @@ class _ServerFormDialogState extends State<ServerFormDialog> {
           child: Text(editing ? l10n.save : l10n.add),
         ),
       ],
+    );
+  }
+}
+
+class _RealmSelector extends StatelessWidget {
+  const _RealmSelector({
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String value;
+  final List<String> options;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return PopupMenuButton<String>(
+      tooltip: label,
+      initialValue: value,
+      position: PopupMenuPosition.under,
+      offset: const Offset(0, 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      onSelected: onChanged,
+      itemBuilder: (context) {
+        return options.map((option) {
+          final selected = option == value;
+          return PopupMenuItem<String>(
+            value: option,
+            child: Row(
+              children: [
+                Icon(
+                  selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+                  size: 20,
+                  color: selected
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  option,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: selected ? colorScheme.primary : null,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList();
+      },
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 16,
+          ),
+        ),
+        child: SizedBox(
+          height: 24,
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 20,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

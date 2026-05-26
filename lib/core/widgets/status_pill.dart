@@ -12,6 +12,7 @@ class StatusPill extends StatelessWidget {
     final color = switch (status) {
       'online' || 'running' => const Color(0xff257a42),
       'stopped' => const Color(0xff6d7280),
+      'permissionDenied' => Theme.of(context).colorScheme.onSurfaceVariant,
       _ => Theme.of(context).colorScheme.error,
     };
 
