@@ -1,4 +1,4 @@
-package com.canary233.PVEManager.pve_manager
+package com.canary233.PVEManager
 
 import android.annotation.SuppressLint
 import android.app.Activity

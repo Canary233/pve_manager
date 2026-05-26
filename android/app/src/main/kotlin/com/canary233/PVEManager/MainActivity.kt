@@ -1,4 +1,4 @@
-package com.canary233.PVEManager.pve_manager
+package com.canary233.PVEManager
 
 import android.content.Intent
 import io.flutter.embedding.android.FlutterActivity
