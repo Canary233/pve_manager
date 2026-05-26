@@ -13,7 +13,7 @@ import 'package:pve_manager/data/services/remote_console_launcher.dart';
 import 'package:pve_manager/core/utils/formatters.dart';
 import 'package:pve_manager/core/widgets/error_state.dart';
 import 'package:pve_manager/core/widgets/usage_line.dart';
-import 'package:pve_manager/core/widgets/cpu_history_chart.dart';
+import 'package:pve_manager/core/widgets/performance_history_card.dart';
 import 'package:pve_manager/view/node/node_tasks_logs_screen.dart';
 
 class NodeDetailScreen extends StatefulWidget {
@@ -295,7 +295,23 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
                   onSelected: _setTimeframe,
                 ),
                 const SizedBox(height: 16),
-                _ChartCard(points: detailData.rrdPoints),
+                PerformanceHistoryCard(
+                  showDiskIo: false,
+                  points: detailData.rrdPoints
+                      .map(
+                        (point) => PerformanceHistoryPoint(
+                          time: point.time,
+                          cpu: point.cpu,
+                          memoryUsed: point.memoryUsed,
+                          memoryTotal: point.memoryTotal,
+                          netIn: point.netIn,
+                          netOut: point.netOut,
+                          diskRead: point.diskRead,
+                          diskWrite: point.diskWrite,
+                        ),
+                      )
+                      .toList(),
+                ),
               ],
             ),
           );
@@ -444,47 +460,6 @@ class _TimeframeSelector extends StatelessWidget {
       'year' => l10n.timeframeYear,
       _ => value,
     };
-  }
-}
-
-class _ChartCard extends StatelessWidget {
-  const _ChartCard({required this.points});
-
-  final List<NodeRrdPoint> points;
-
-  @override
-  Widget build(BuildContext context) {
-    final memoryMax = points.fold<int>(
-      0,
-      (max, point) => point.memoryTotal > max ? point.memoryTotal : max,
-    );
-
-    return _DetailCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _CardTitle(title: context.l10n.cpuUsage),
-          const SizedBox(height: 16),
-          CpuHistoryChart(points: points),
-          const SizedBox(height: 24),
-          _CardTitle(title: context.l10n.memoryHistory),
-          const SizedBox(height: 16),
-          MetricHistoryChart(
-            values: points.map((point) => point.memoryUsed.toDouble()).toList(),
-            maxValue: memoryMax > 0 ? memoryMax.toDouble() : null,
-            valueLabelBuilder: _gib,
-            lineColor: Theme.of(context).colorScheme.secondary,
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _gib(double value) {
-    if (value <= 0) {
-      return '0 GiB';
-    }
-    return '${(value / 1024 / 1024 / 1024).toStringAsFixed(1)}\u00a0GiB';
   }
 }
 

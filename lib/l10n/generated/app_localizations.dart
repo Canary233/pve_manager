@@ -479,8 +479,26 @@ abstract class AppLocalizations {
   /// No description provided for @memoryHistory.
   ///
   /// In zh, this message translates to:
-  /// **'内存使用量'**
+  /// **'内存使用率'**
   String get memoryHistory;
+
+  /// No description provided for @totalMemory.
+  ///
+  /// In zh, this message translates to:
+  /// **'(共计 {value})'**
+  String totalMemory(Object value);
+
+  /// No description provided for @networkIo.
+  ///
+  /// In zh, this message translates to:
+  /// **'网络 IO'**
+  String get networkIo;
+
+  /// No description provided for @diskIo.
+  ///
+  /// In zh, this message translates to:
+  /// **'磁盘 IO'**
+  String get diskIo;
 
   /// No description provided for @processor.
   ///

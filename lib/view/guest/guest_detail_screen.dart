@@ -6,14 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:pve_manager/core/l10n/l10n_extensions.dart';
 import 'package:pve_manager/data/models/guest_action.dart';
 import 'package:pve_manager/data/models/guest_rrd_point.dart';
-import 'package:pve_manager/data/models/node_rrd_point.dart';
 import 'package:pve_manager/data/models/pve_resource.dart';
 import 'package:pve_manager/data/services/proxmox_client.dart';
 import 'package:pve_manager/data/services/remote_console_launcher.dart';
 import 'package:pve_manager/core/utils/formatters.dart';
 import 'package:pve_manager/core/widgets/status_pill.dart';
 import 'package:pve_manager/core/widgets/usage_line.dart';
-import 'package:pve_manager/core/widgets/cpu_history_chart.dart';
+import 'package:pve_manager/core/widgets/performance_history_card.dart';
 
 class GuestDetailScreen extends StatefulWidget {
   const GuestDetailScreen({
@@ -350,16 +349,17 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
               final points = snapshot.data ?? _lastHistory;
               if (snapshot.connectionState == ConnectionState.waiting &&
                   points == null) {
-                return const _HistoryCard(
+                return const Card(
                   child: SizedBox(
-                    height: 180,
+                    height: 212,
                     child: Center(child: CircularProgressIndicator()),
                   ),
                 );
               }
 
               if (snapshot.hasError && points == null) {
-                return _HistoryCard(
+                return Card(
+                  color: Theme.of(context).colorScheme.surfaceContainerLowest,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Text(localizedError(l10n, snapshot.error!)),
@@ -368,49 +368,26 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
               }
 
               final historyPoints = points!;
-              final memoryMax = _memoryMax(historyPoints, guest);
-              return Column(
-                children: [
-                  _HistoryCard(
-                    title: l10n.cpuUsage,
-                    child: CpuHistoryChart(
-                      points: historyPoints
-                          .map(
-                            (point) => NodeRrdPoint(
-                              time: point.time,
-                              cpu: point.cpu,
-                              memoryUsed: point.memoryUsed,
-                              memoryTotal: point.memoryTotal,
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _HistoryCard(
-                    title: l10n.memoryHistory,
-                    child: MetricHistoryChart(
-                      values: historyPoints
-                          .map((point) => point.memoryUsed.toDouble())
-                          .toList(),
-                      maxValue: memoryMax > 0 ? memoryMax.toDouble() : null,
-                      valueLabelBuilder: (value) => bytes(value.round()),
-                      lineColor: Theme.of(context).colorScheme.secondary,
-                    ),
-                  ),
-                ],
+              return PerformanceHistoryCard(
+                points: historyPoints
+                    .map(
+                      (point) => PerformanceHistoryPoint(
+                        time: point.time,
+                        cpu: point.cpu,
+                        memoryUsed: point.memoryUsed,
+                        memoryTotal: point.memoryTotal,
+                        netIn: point.netIn,
+                        netOut: point.netOut,
+                        diskRead: point.diskRead,
+                        diskWrite: point.diskWrite,
+                      ),
+                    )
+                    .toList(),
               );
             },
           ),
         ],
       ),
-    );
-  }
-
-  int _memoryMax(List<GuestRrdPoint> points, PveResource guest) {
-    return points.fold<int>(
-      guest.memoryTotal,
-      (max, point) => point.memoryTotal > max ? point.memoryTotal : max,
     );
   }
 }
@@ -466,38 +443,5 @@ class _GuestTimeframeSelector extends StatelessWidget {
       'year' => l10n.timeframeYear,
       _ => value,
     };
-  }
-}
-
-class _HistoryCard extends StatelessWidget {
-  const _HistoryCard({this.title, required this.child});
-
-  final String? title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final title = this.title;
-    return Card(
-      color: Theme.of(context).colorScheme.surfaceContainerLowest,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (title != null) ...[
-              Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 12),
-            ],
-            child,
-          ],
-        ),
-      ),
-    );
   }
 }

@@ -19,6 +19,7 @@ class CpuHistoryChart extends StatelessWidget {
 
     return MetricHistoryChart(
       values: points.map((point) => point.cpu).toList(),
+      timestamps: points.map((point) => point.time).toList(),
       maxValue: maxValue,
       valueLabelBuilder: percent,
     );
@@ -29,6 +30,7 @@ class MetricHistoryChart extends StatelessWidget {
   const MetricHistoryChart({
     required this.values,
     required this.valueLabelBuilder,
+    this.timestamps = const <int>[],
     this.maxValue,
     this.lineColor,
     this.fillColor,
@@ -36,6 +38,7 @@ class MetricHistoryChart extends StatelessWidget {
   });
 
   final List<double> values;
+  final List<int> timestamps;
   final String Function(double value) valueLabelBuilder;
   final double? maxValue;
   final Color? lineColor;
@@ -73,6 +76,7 @@ class MetricHistoryChart extends StatelessWidget {
       child: CustomPaint(
         painter: _MetricHistoryPainter(
           values: values,
+          timestamps: timestamps,
           maxValue: visibleMaxValue,
           valueLabelBuilder: valueLabelBuilder,
           lineColor: lineColor ?? colorScheme.primary,
@@ -91,6 +95,7 @@ class MetricHistoryChart extends StatelessWidget {
 class _MetricHistoryPainter extends CustomPainter {
   const _MetricHistoryPainter({
     required this.values,
+    required this.timestamps,
     required this.maxValue,
     required this.valueLabelBuilder,
     required this.lineColor,
@@ -101,6 +106,7 @@ class _MetricHistoryPainter extends CustomPainter {
   });
 
   final List<double> values;
+  final List<int> timestamps;
   final double maxValue;
   final String Function(double value) valueLabelBuilder;
   final Color lineColor;
@@ -111,10 +117,12 @@ class _MetricHistoryPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const leftPadding = 76.0;
-    const bottomPadding = 24.0;
+    final compact = size.width < 360;
+    const bottomPadding = 46.0;
     const topPadding = 12.0;
-    const rightPadding = 10.0;
+    final rightPadding = compact ? 2.0 : 10.0;
+    const horizontalLines = 4;
+    final leftPadding = compact ? 38.0 : 46.0;
 
     final chartRect = Rect.fromLTWH(
       leftPadding,
@@ -130,7 +138,6 @@ class _MetricHistoryPainter extends CustomPainter {
       ..color = gridColor
       ..strokeWidth = 1;
 
-    const horizontalLines = 4;
     for (var i = 0; i <= horizontalLines; i++) {
       final y = chartRect.top + chartRect.height * i / horizontalLines;
       canvas.drawLine(
@@ -145,7 +152,7 @@ class _MetricHistoryPainter extends CustomPainter {
         chartRect,
         y,
         valueLabelBuilder(value),
-        leftPadding - 10,
+        compact: compact,
       );
     }
 
@@ -157,6 +164,7 @@ class _MetricHistoryPainter extends CustomPainter {
         gridPaint,
       );
     }
+    _drawXAxisLabels(canvas, chartRect, compact: compact);
 
     final path = Path();
     final fillPath = Path();
@@ -207,19 +215,22 @@ class _MetricHistoryPainter extends CustomPainter {
     Canvas canvas,
     Rect chartRect,
     double centerY,
-    String text,
-    double maxWidth,
-  ) {
+    String text, {
+    required bool compact,
+  }) {
     final painter = TextPainter(
       text: TextSpan(
         text: text,
         style:
-            textStyle?.copyWith(color: labelColor) ??
+            textStyle?.copyWith(
+              color: labelColor,
+              fontSize: compact ? 10 : textStyle?.fontSize,
+            ) ??
             TextStyle(color: labelColor, fontSize: 11),
       ),
       textDirection: TextDirection.ltr,
       maxLines: 1,
-    )..layout(maxWidth: maxWidth);
+    )..layout();
     final y = (centerY - painter.height / 2).clamp(
       0,
       chartRect.bottom - painter.height,
@@ -228,9 +239,68 @@ class _MetricHistoryPainter extends CustomPainter {
     painter.paint(canvas, offset);
   }
 
+  void _drawXAxisLabels(
+    Canvas canvas,
+    Rect chartRect, {
+    required bool compact,
+  }) {
+    if (timestamps.isEmpty) {
+      return;
+    }
+
+    final labelIndexes = _xAxisLabelIndexes();
+    for (final index in labelIndexes) {
+      final timestampSeconds = timestamps[index];
+      if (timestampSeconds <= 0) {
+        continue;
+      }
+
+      final ratio = timestamps.length == 1
+          ? 0.5
+          : index / (timestamps.length - 1);
+      final x = chartRect.left + chartRect.width * ratio;
+      final text = _timeLabel(timestampSeconds);
+      final painter = TextPainter(
+        text: TextSpan(
+          text: text,
+          style:
+              textStyle?.copyWith(
+                color: labelColor,
+                fontSize: compact ? 10 : textStyle?.fontSize,
+              ) ??
+              TextStyle(color: labelColor, fontSize: compact ? 10 : 11),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 2,
+        textAlign: TextAlign.center,
+      )..layout(maxWidth: compact ? 46 : 58);
+      final left = (x - painter.width / 2).clamp(
+        chartRect.left,
+        chartRect.right - painter.width,
+      );
+      painter.paint(canvas, Offset(left.toDouble(), chartRect.bottom + 8));
+    }
+  }
+
+  List<int> _xAxisLabelIndexes() {
+    final lastIndex = timestamps.length - 1;
+    if (lastIndex <= 0) {
+      return const <int>[0];
+    }
+    return <int>{0, lastIndex ~/ 2, lastIndex}.toList()..sort();
+  }
+
+  String _timeLabel(int seconds) {
+    final dateTime = DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+    String twoDigits(int value) => value.toString().padLeft(2, '0');
+    return '${twoDigits(dateTime.month)}-${twoDigits(dateTime.day)}\n'
+        '${twoDigits(dateTime.hour)}:${twoDigits(dateTime.minute)}';
+  }
+
   @override
   bool shouldRepaint(covariant _MetricHistoryPainter oldDelegate) {
     return oldDelegate.values != values ||
+        oldDelegate.timestamps != timestamps ||
         oldDelegate.maxValue != maxValue ||
         oldDelegate.lineColor != lineColor ||
         oldDelegate.fillColor != fillColor ||

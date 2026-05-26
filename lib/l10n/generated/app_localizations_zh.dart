@@ -206,7 +206,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cpuUsage => 'CPU 使用率';
 
   @override
-  String get memoryHistory => '内存使用量';
+  String get memoryHistory => '内存使用率';
+
+  @override
+  String totalMemory(Object value) {
+    return '(共计 $value)';
+  }
+
+  @override
+  String get networkIo => '网络 IO';
+
+  @override
+  String get diskIo => '磁盘 IO';
 
   @override
   String get processor => '处理器';

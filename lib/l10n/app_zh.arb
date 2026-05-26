@@ -89,7 +89,15 @@
   "systemInfo": "系统信息",
   "resourceUsage": "资源使用情况",
   "cpuUsage": "CPU 使用率",
-  "memoryHistory": "内存使用量",
+  "memoryHistory": "内存使用率",
+  "totalMemory": "(共计 {value})",
+  "@totalMemory": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "networkIo": "网络 IO",
+  "diskIo": "磁盘 IO",
   "processor": "处理器",
   "cpuCores": "CPU 核心",
   "cpuCoresValue": "{cpus}核 {sockets}插槽",

@@ -6,6 +6,10 @@ class GuestRrdPoint {
     required this.cpu,
     required this.memoryUsed,
     required this.memoryTotal,
+    required this.netIn,
+    required this.netOut,
+    required this.diskRead,
+    required this.diskWrite,
   });
 
   factory GuestRrdPoint.fromJson(Map<String, dynamic> json) {
@@ -14,6 +18,10 @@ class GuestRrdPoint {
       cpu: asDouble(json['cpu']).clamp(0, 1),
       memoryUsed: asInt(json['mem']),
       memoryTotal: asInt(json['maxmem']),
+      netIn: asDouble(json['netin']),
+      netOut: asDouble(json['netout']),
+      diskRead: asDouble(json['diskread']),
+      diskWrite: asDouble(json['diskwrite']),
     );
   }
 
@@ -21,4 +29,8 @@ class GuestRrdPoint {
   final double cpu;
   final int memoryUsed;
   final int memoryTotal;
+  final double netIn;
+  final double netOut;
+  final double diskRead;
+  final double diskWrite;
 }

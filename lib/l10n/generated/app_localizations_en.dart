@@ -207,7 +207,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cpuUsage => 'CPU usage';
 
   @override
-  String get memoryHistory => 'Memory usage';
+  String get memoryHistory => 'Memory usage rate';
+
+  @override
+  String totalMemory(Object value) {
+    return '(Total $value)';
+  }
+
+  @override
+  String get networkIo => 'Network I/O';
+
+  @override
+  String get diskIo => 'Disk I/O';
 
   @override
   String get processor => 'Processor';
