@@ -42,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _refreshTimer;
   bool _isInitializing = true;
   bool _isLoading = false;
-  String? _connectingOrigin;
+  Object? _connectingServerKey;
   String? _error;
 
   @override
@@ -282,7 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       _isLoading = true;
-      _connectingOrigin = server.origin;
+      _connectingServerKey = _serverKey(server);
       _error = null;
     });
 
@@ -301,7 +301,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _servers[index] = connectedServer;
         }
         _isLoading = false;
-        _connectingOrigin = null;
+        _connectingServerKey = null;
       });
       if (!mounted) {
         client.close();
@@ -328,10 +328,15 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _connectingOrigin = null;
+          _connectingServerKey = null;
         });
       }
     }
+  }
+
+  Object _serverKey(PveServerConfig server) {
+    return server.id ??
+        Object.hash(server.origin, server.username, server.realm);
   }
 
   @override
@@ -384,7 +389,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             server: server,
                             isConnecting:
                                 _isLoading &&
-                                _connectingOrigin == server.origin,
+                                _connectingServerKey == _serverKey(server),
                             onTap: () => _connect(server),
                             onLongPress: () => _showServerActions(index),
                           );
