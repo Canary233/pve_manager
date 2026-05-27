@@ -65,6 +65,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get confirm => 'Confirm';
 
   @override
+  String get enable => 'Enable';
+
+  @override
+  String get disable => 'Disable';
+
+  @override
+  String get yes => 'Yes';
+
+  @override
+  String get no => 'No';
+
+  @override
   String get retry => 'Retry';
 
   @override
@@ -78,6 +90,151 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get power => 'Power';
+
+  @override
+  String get hardwareConfig => 'Hardware config';
+
+  @override
+  String get configValue => 'Config value';
+
+  @override
+  String get configSaved => 'Config saved';
+
+  @override
+  String get notEditable => 'Not editable';
+
+  @override
+  String get features => 'Features';
+
+  @override
+  String get editFeatures => 'Edit features';
+
+  @override
+  String get featureKeyctl => 'Keyctl';
+
+  @override
+  String get featureNesting => 'Nesting';
+
+  @override
+  String get featureMknod => 'Create device nodes';
+
+  @override
+  String get experimental => 'Experimental';
+
+  @override
+  String get requiresUnprivilegedContainer =>
+      'Requires an unprivileged container';
+
+  @override
+  String get bootOrder => 'Boot order';
+
+  @override
+  String get selectBootDevices => 'Select boot devices';
+
+  @override
+  String get noBootDevices => 'No bootable devices found';
+
+  @override
+  String get onBoot => 'Start at boot';
+
+  @override
+  String get editCpu => 'Edit CPU';
+
+  @override
+  String get cpuType => 'CPU type';
+
+  @override
+  String get cpuAffinity => 'CPU affinity';
+
+  @override
+  String get osType => 'OS type';
+
+  @override
+  String get tags => 'Tags';
+
+  @override
+  String get network => 'Network';
+
+  @override
+  String get architecture => 'Architecture';
+
+  @override
+  String get bridge => 'Bridge';
+
+  @override
+  String get model => 'Model';
+
+  @override
+  String get vlanTag => 'VLAN tag';
+
+  @override
+  String get firewall => 'Firewall';
+
+  @override
+  String get disconnected => 'Disconnected';
+
+  @override
+  String get rateLimit => 'Rate limit (MB/s)';
+
+  @override
+  String get mtu => 'MTU';
+
+  @override
+  String get multiqueue => 'Multiqueue';
+
+  @override
+  String get ipAddress => 'IP address';
+
+  @override
+  String get gateway => 'Gateway';
+
+  @override
+  String get macAddress => 'MAC address';
+
+  @override
+  String get networkName => 'Name';
+
+  @override
+  String get networkType => 'Type';
+
+  @override
+  String get cpuUnits => 'CPU weight';
+
+  @override
+  String get editMemory => 'Edit memory';
+
+  @override
+  String get memoryMib => 'Memory (MiB)';
+
+  @override
+  String get minimumMemoryMib => 'Minimum memory (MiB)';
+
+  @override
+  String get memoryShares => 'Shares';
+
+  @override
+  String get defaultMemoryShares => 'Default (1000)';
+
+  @override
+  String get ballooningDevice => 'Ballooning device';
+
+  @override
+  String get allowKsm => 'Allow KSM';
+
+  @override
+  String get machine => 'Machine';
+
+  @override
+  String get display => 'Display';
+
+  @override
+  String get scsiController => 'SCSI controller';
+
+  @override
+  String get cpuSockets => 'CPU sockets';
+
+  @override
+  String get defaultValue => 'Default';
 
   @override
   String get terminal => 'Terminal';

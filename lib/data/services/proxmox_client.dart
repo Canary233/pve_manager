@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:pve_manager/data/models/guest_action.dart';
+import 'package:pve_manager/data/models/guest_config.dart';
 import 'package:pve_manager/data/models/guest_rrd_point.dart';
 import 'package:pve_manager/data/models/node_log_entry.dart';
 import 'package:pve_manager/data/models/node_power_action.dart';
@@ -148,6 +149,9 @@ class ProxmoxClient {
         if (typeOrder != 0) {
           return typeOrder;
         }
+        if (a.isGuest && b.isGuest) {
+          return (a.vmid ?? 0).compareTo(b.vmid ?? 0);
+        }
         return a.name.compareTo(b.name);
       });
   }
@@ -274,6 +278,71 @@ class ProxmoxClient {
     }
 
     return guest.mergeStatus(data);
+  }
+
+  Future<GuestConfig> getGuestConfig(PveResource guest) async {
+    if (!guest.isGuest) {
+      throw const ProxmoxApiException(ProxmoxErrorCode.guestActionOnly);
+    }
+
+    final guestPath = _guestApiPath(guest);
+    final path = '/nodes/${guest.node}/$guestPath/${guest.vmid}/config';
+    final response = await _request(
+      'GET',
+      path,
+    );
+    final data = response['data'];
+
+    var editSchema = const GuestConfigEditSchema.unavailable();
+    try {
+      final optionsResponse = await _request('OPTIONS', path);
+      editSchema = GuestConfigEditSchema.fromOptions(optionsResponse['data']);
+    } on ProxmoxApiException {
+      editSchema = const GuestConfigEditSchema.unavailable();
+    }
+
+    if (data is! Map<String, dynamic>) {
+      return GuestConfig(
+        values: const <String, String>{},
+        editSchema: editSchema,
+      );
+    }
+
+    final config = <String, String>{};
+    for (final entry in data.entries) {
+      if (entry.key == 'digest') {
+        continue;
+      }
+      config[entry.key] = entry.value?.toString() ?? '';
+    }
+    return GuestConfig(values: config, editSchema: editSchema);
+  }
+
+  Future<void> updateGuestConfig(
+    PveResource guest,
+    String key,
+    String value,
+  ) async {
+    await updateGuestConfigValues(guest, {key: value});
+  }
+
+  Future<void> updateGuestConfigValues(
+    PveResource guest,
+    Map<String, String> values,
+  ) async {
+    if (!guest.isGuest) {
+      throw const ProxmoxApiException(ProxmoxErrorCode.guestActionOnly);
+    }
+    if (values.isEmpty) {
+      return;
+    }
+
+    final guestPath = _guestApiPath(guest);
+    await _request(
+      'PUT',
+      '/nodes/${guest.node}/$guestPath/${guest.vmid}/config',
+      body: values,
+    );
   }
 
   Future<PagedResult<NodeTask>> getNodeTasks(
@@ -433,6 +502,16 @@ class ProxmoxClient {
     };
 
     await _request('POST', path);
+  }
+
+  String _guestApiPath(PveResource guest) {
+    return switch (guest.type) {
+      'qemu' => 'qemu',
+      'lxc' => 'lxc',
+      _ => throw const ProxmoxApiException(
+        ProxmoxErrorCode.unsupportedResourceType,
+      ),
+    };
   }
 
   Future<_ApiResponse> _getWithParameterFallback(

@@ -206,6 +206,30 @@ abstract class AppLocalizations {
   /// **'确定'**
   String get confirm;
 
+  /// No description provided for @enable.
+  ///
+  /// In zh, this message translates to:
+  /// **'启用'**
+  String get enable;
+
+  /// No description provided for @disable.
+  ///
+  /// In zh, this message translates to:
+  /// **'禁用'**
+  String get disable;
+
+  /// No description provided for @yes.
+  ///
+  /// In zh, this message translates to:
+  /// **'是'**
+  String get yes;
+
+  /// No description provided for @no.
+  ///
+  /// In zh, this message translates to:
+  /// **'否'**
+  String get no;
+
   /// No description provided for @retry.
   ///
   /// In zh, this message translates to:
@@ -235,6 +259,294 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'电源'**
   String get power;
+
+  /// No description provided for @hardwareConfig.
+  ///
+  /// In zh, this message translates to:
+  /// **'硬件配置'**
+  String get hardwareConfig;
+
+  /// No description provided for @configValue.
+  ///
+  /// In zh, this message translates to:
+  /// **'配置值'**
+  String get configValue;
+
+  /// No description provided for @configSaved.
+  ///
+  /// In zh, this message translates to:
+  /// **'配置已保存'**
+  String get configSaved;
+
+  /// No description provided for @notEditable.
+  ///
+  /// In zh, this message translates to:
+  /// **'不可修改'**
+  String get notEditable;
+
+  /// No description provided for @features.
+  ///
+  /// In zh, this message translates to:
+  /// **'功能'**
+  String get features;
+
+  /// No description provided for @editFeatures.
+  ///
+  /// In zh, this message translates to:
+  /// **'编辑功能'**
+  String get editFeatures;
+
+  /// No description provided for @featureKeyctl.
+  ///
+  /// In zh, this message translates to:
+  /// **'按键'**
+  String get featureKeyctl;
+
+  /// No description provided for @featureNesting.
+  ///
+  /// In zh, this message translates to:
+  /// **'嵌套'**
+  String get featureNesting;
+
+  /// No description provided for @featureMknod.
+  ///
+  /// In zh, this message translates to:
+  /// **'创建设备节点'**
+  String get featureMknod;
+
+  /// No description provided for @experimental.
+  ///
+  /// In zh, this message translates to:
+  /// **'实验性'**
+  String get experimental;
+
+  /// No description provided for @requiresUnprivilegedContainer.
+  ///
+  /// In zh, this message translates to:
+  /// **'需要无特权容器'**
+  String get requiresUnprivilegedContainer;
+
+  /// No description provided for @bootOrder.
+  ///
+  /// In zh, this message translates to:
+  /// **'启动项'**
+  String get bootOrder;
+
+  /// No description provided for @selectBootDevices.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择启动设备'**
+  String get selectBootDevices;
+
+  /// No description provided for @noBootDevices.
+  ///
+  /// In zh, this message translates to:
+  /// **'未读取到可启动设备'**
+  String get noBootDevices;
+
+  /// No description provided for @onBoot.
+  ///
+  /// In zh, this message translates to:
+  /// **'开机自启动'**
+  String get onBoot;
+
+  /// No description provided for @editCpu.
+  ///
+  /// In zh, this message translates to:
+  /// **'编辑 CPU'**
+  String get editCpu;
+
+  /// No description provided for @cpuType.
+  ///
+  /// In zh, this message translates to:
+  /// **'CPU 类型'**
+  String get cpuType;
+
+  /// No description provided for @cpuAffinity.
+  ///
+  /// In zh, this message translates to:
+  /// **'CPU 亲和性'**
+  String get cpuAffinity;
+
+  /// No description provided for @osType.
+  ///
+  /// In zh, this message translates to:
+  /// **'OS 类型'**
+  String get osType;
+
+  /// No description provided for @tags.
+  ///
+  /// In zh, this message translates to:
+  /// **'标签'**
+  String get tags;
+
+  /// No description provided for @network.
+  ///
+  /// In zh, this message translates to:
+  /// **'网络'**
+  String get network;
+
+  /// No description provided for @architecture.
+  ///
+  /// In zh, this message translates to:
+  /// **'架构'**
+  String get architecture;
+
+  /// No description provided for @bridge.
+  ///
+  /// In zh, this message translates to:
+  /// **'网桥'**
+  String get bridge;
+
+  /// No description provided for @model.
+  ///
+  /// In zh, this message translates to:
+  /// **'型号'**
+  String get model;
+
+  /// No description provided for @vlanTag.
+  ///
+  /// In zh, this message translates to:
+  /// **'VLAN 标签'**
+  String get vlanTag;
+
+  /// No description provided for @firewall.
+  ///
+  /// In zh, this message translates to:
+  /// **'防火墙'**
+  String get firewall;
+
+  /// No description provided for @disconnected.
+  ///
+  /// In zh, this message translates to:
+  /// **'断开'**
+  String get disconnected;
+
+  /// No description provided for @rateLimit.
+  ///
+  /// In zh, this message translates to:
+  /// **'速率限制 (MB/s)'**
+  String get rateLimit;
+
+  /// No description provided for @mtu.
+  ///
+  /// In zh, this message translates to:
+  /// **'MTU'**
+  String get mtu;
+
+  /// No description provided for @multiqueue.
+  ///
+  /// In zh, this message translates to:
+  /// **'Multiqueue'**
+  String get multiqueue;
+
+  /// No description provided for @ipAddress.
+  ///
+  /// In zh, this message translates to:
+  /// **'IP 地址'**
+  String get ipAddress;
+
+  /// No description provided for @gateway.
+  ///
+  /// In zh, this message translates to:
+  /// **'网关'**
+  String get gateway;
+
+  /// No description provided for @macAddress.
+  ///
+  /// In zh, this message translates to:
+  /// **'MAC 地址'**
+  String get macAddress;
+
+  /// No description provided for @networkName.
+  ///
+  /// In zh, this message translates to:
+  /// **'名称'**
+  String get networkName;
+
+  /// No description provided for @networkType.
+  ///
+  /// In zh, this message translates to:
+  /// **'类型'**
+  String get networkType;
+
+  /// No description provided for @cpuUnits.
+  ///
+  /// In zh, this message translates to:
+  /// **'CPU 权重'**
+  String get cpuUnits;
+
+  /// No description provided for @editMemory.
+  ///
+  /// In zh, this message translates to:
+  /// **'编辑内存'**
+  String get editMemory;
+
+  /// No description provided for @memoryMib.
+  ///
+  /// In zh, this message translates to:
+  /// **'内存 (MiB)'**
+  String get memoryMib;
+
+  /// No description provided for @minimumMemoryMib.
+  ///
+  /// In zh, this message translates to:
+  /// **'最小内存 (MiB)'**
+  String get minimumMemoryMib;
+
+  /// No description provided for @memoryShares.
+  ///
+  /// In zh, this message translates to:
+  /// **'共享'**
+  String get memoryShares;
+
+  /// No description provided for @defaultMemoryShares.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认 (1000)'**
+  String get defaultMemoryShares;
+
+  /// No description provided for @ballooningDevice.
+  ///
+  /// In zh, this message translates to:
+  /// **'Ballooning 设备'**
+  String get ballooningDevice;
+
+  /// No description provided for @allowKsm.
+  ///
+  /// In zh, this message translates to:
+  /// **'允许 KSM'**
+  String get allowKsm;
+
+  /// No description provided for @machine.
+  ///
+  /// In zh, this message translates to:
+  /// **'机型'**
+  String get machine;
+
+  /// No description provided for @display.
+  ///
+  /// In zh, this message translates to:
+  /// **'显示'**
+  String get display;
+
+  /// No description provided for @scsiController.
+  ///
+  /// In zh, this message translates to:
+  /// **'SCSI 控制器'**
+  String get scsiController;
+
+  /// No description provided for @cpuSockets.
+  ///
+  /// In zh, this message translates to:
+  /// **'CPU 插槽'**
+  String get cpuSockets;
+
+  /// No description provided for @defaultValue.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认'**
+  String get defaultValue;
 
   /// No description provided for @terminal.
   ///

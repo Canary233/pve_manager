@@ -13,6 +13,7 @@ import 'package:pve_manager/core/utils/formatters.dart';
 import 'package:pve_manager/core/widgets/status_pill.dart';
 import 'package:pve_manager/core/widgets/usage_line.dart';
 import 'package:pve_manager/core/widgets/performance_history_card.dart';
+import 'package:pve_manager/view/guest/guest_config_screen.dart';
 
 class GuestDetailScreen extends StatefulWidget {
   const GuestDetailScreen({
@@ -21,6 +22,7 @@ class GuestDetailScreen extends StatefulWidget {
     required this.autoRefreshIntervalListenable,
     this.embedded = false,
     this.onActionCompleted,
+    this.onOpenConfig,
     super.key,
   });
 
@@ -29,6 +31,7 @@ class GuestDetailScreen extends StatefulWidget {
   final ValueListenable<Duration> autoRefreshIntervalListenable;
   final bool embedded;
   final VoidCallback? onActionCompleted;
+  final VoidCallback? onOpenConfig;
 
   @override
   State<GuestDetailScreen> createState() => _GuestDetailScreenState();
@@ -161,6 +164,7 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
   Future<void> _showPowerActions() async {
     final action = await showModalBottomSheet<GuestAction>(
       context: context,
+      useRootNavigator: widget.embedded,
       showDragHandle: true,
       builder: (context) => SafeArea(
         child: Column(
@@ -178,6 +182,24 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
 
     if (action != null && mounted) {
       await _runAction(action);
+    }
+  }
+
+  Future<void> _openConfig() async {
+    final onOpenConfig = widget.onOpenConfig;
+    if (widget.embedded && onOpenConfig != null) {
+      onOpenConfig();
+      return;
+    }
+
+    await Navigator.of(context, rootNavigator: widget.embedded).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            GuestConfigScreen(client: widget.client, guest: widget.guest),
+      ),
+    );
+    if (mounted) {
+      await _refreshData();
     }
   }
 
@@ -233,6 +255,11 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
         automaticallyImplyLeading: !widget.embedded,
         title: Text(guest.name),
         actions: [
+          IconButton(
+            tooltip: l10n.hardwareConfig,
+            onPressed: _openConfig,
+            icon: const Icon(Icons.tune_rounded),
+          ),
           IconButton(
             tooltip: l10n.powerActions,
             onPressed: _isActionRunning ? null : _showPowerActions,

@@ -65,6 +65,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get confirm => '确定';
 
   @override
+  String get enable => '启用';
+
+  @override
+  String get disable => '禁用';
+
+  @override
+  String get yes => '是';
+
+  @override
+  String get no => '否';
+
+  @override
   String get retry => '重试';
 
   @override
@@ -78,6 +90,150 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get power => '电源';
+
+  @override
+  String get hardwareConfig => '硬件配置';
+
+  @override
+  String get configValue => '配置值';
+
+  @override
+  String get configSaved => '配置已保存';
+
+  @override
+  String get notEditable => '不可修改';
+
+  @override
+  String get features => '功能';
+
+  @override
+  String get editFeatures => '编辑功能';
+
+  @override
+  String get featureKeyctl => '按键';
+
+  @override
+  String get featureNesting => '嵌套';
+
+  @override
+  String get featureMknod => '创建设备节点';
+
+  @override
+  String get experimental => '实验性';
+
+  @override
+  String get requiresUnprivilegedContainer => '需要无特权容器';
+
+  @override
+  String get bootOrder => '启动项';
+
+  @override
+  String get selectBootDevices => '选择启动设备';
+
+  @override
+  String get noBootDevices => '未读取到可启动设备';
+
+  @override
+  String get onBoot => '开机自启动';
+
+  @override
+  String get editCpu => '编辑 CPU';
+
+  @override
+  String get cpuType => 'CPU 类型';
+
+  @override
+  String get cpuAffinity => 'CPU 亲和性';
+
+  @override
+  String get osType => 'OS 类型';
+
+  @override
+  String get tags => '标签';
+
+  @override
+  String get network => '网络';
+
+  @override
+  String get architecture => '架构';
+
+  @override
+  String get bridge => '网桥';
+
+  @override
+  String get model => '型号';
+
+  @override
+  String get vlanTag => 'VLAN 标签';
+
+  @override
+  String get firewall => '防火墙';
+
+  @override
+  String get disconnected => '断开';
+
+  @override
+  String get rateLimit => '速率限制 (MB/s)';
+
+  @override
+  String get mtu => 'MTU';
+
+  @override
+  String get multiqueue => 'Multiqueue';
+
+  @override
+  String get ipAddress => 'IP 地址';
+
+  @override
+  String get gateway => '网关';
+
+  @override
+  String get macAddress => 'MAC 地址';
+
+  @override
+  String get networkName => '名称';
+
+  @override
+  String get networkType => '类型';
+
+  @override
+  String get cpuUnits => 'CPU 权重';
+
+  @override
+  String get editMemory => '编辑内存';
+
+  @override
+  String get memoryMib => '内存 (MiB)';
+
+  @override
+  String get minimumMemoryMib => '最小内存 (MiB)';
+
+  @override
+  String get memoryShares => '共享';
+
+  @override
+  String get defaultMemoryShares => '默认 (1000)';
+
+  @override
+  String get ballooningDevice => 'Ballooning 设备';
+
+  @override
+  String get allowKsm => '允许 KSM';
+
+  @override
+  String get machine => '机型';
+
+  @override
+  String get display => '显示';
+
+  @override
+  String get scsiController => 'SCSI 控制器';
+
+  @override
+  String get cpuSockets => 'CPU 插槽';
+
+  @override
+  String get defaultValue => '默认';
 
   @override
   String get terminal => '终端';

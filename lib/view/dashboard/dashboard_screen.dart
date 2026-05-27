@@ -11,6 +11,7 @@ import 'package:pve_manager/data/models/pve_snapshot.dart';
 import 'package:pve_manager/data/services/proxmox_client.dart';
 import 'package:pve_manager/data/services/proxmox_api_exception.dart';
 import 'package:pve_manager/core/widgets/error_state.dart';
+import 'package:pve_manager/view/guest/guest_config_screen.dart';
 import 'package:pve_manager/view/guest/guest_detail_screen.dart';
 import 'package:pve_manager/view/dashboard/widgets/guest_panel.dart';
 import 'package:pve_manager/view/node/node_detail_screen.dart';
@@ -249,6 +250,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  void _selectGuestConfig(PveResource guest) {
+    setState(() {
+      _selection = _DashboardSelection.guestConfig(guest.id);
+    });
+  }
+
+  void _selectGuestDetail(PveResource guest) {
+    setState(() {
+      _selection = _DashboardSelection.guest(guest.id);
+    });
+  }
+
   Future<void> _openGuestRoute(PveResource guest) async {
     final shouldRefresh = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
@@ -364,6 +377,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             return selection;
           }
         case _DashboardSelectionType.guest:
+        case _DashboardSelectionType.guestConfig:
           if (guests.any((guest) => guest.id == selection.id)) {
             return selection;
           }
@@ -415,6 +429,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
           autoRefreshIntervalListenable: widget.autoRefreshIntervalListenable,
           embedded: true,
           onActionCompleted: _refreshSnapshot,
+          onOpenConfig: () => _selectGuestConfig(guest),
+        );
+      case _DashboardSelectionType.guestConfig:
+        final guest = _findGuest(guests, selection.id);
+        if (guest == null) {
+          return const SizedBox.shrink();
+        }
+        return GuestConfigScreen(
+          key: ValueKey('guest-config-${guest.id}'),
+          client: widget.client,
+          guest: guest,
+          embedded: true,
+          onBack: () => _selectGuestDetail(guest),
         );
     }
   }
@@ -438,7 +465,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-enum _DashboardSelectionType { node, guest }
+enum _DashboardSelectionType { node, guest, guestConfig }
 
 class _DashboardSelection {
   const _DashboardSelection._(this.type, this.id);
@@ -448,6 +475,9 @@ class _DashboardSelection {
 
   const _DashboardSelection.guest(String id)
     : this._(_DashboardSelectionType.guest, id);
+
+  const _DashboardSelection.guestConfig(String id)
+    : this._(_DashboardSelectionType.guestConfig, id);
 
   final _DashboardSelectionType type;
   final String id;
@@ -503,7 +533,9 @@ class _DashboardList extends StatelessWidget {
           GuestPanel(
             guests: guests,
             onSelect: onGuestTap,
-            selectedGuestId: selection?.type == _DashboardSelectionType.guest
+            selectedGuestId:
+                selection?.type == _DashboardSelectionType.guest ||
+                    selection?.type == _DashboardSelectionType.guestConfig
                 ? selection?.id
                 : null,
           ),
