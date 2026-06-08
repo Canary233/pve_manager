@@ -144,6 +144,7 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
     final l10n = context.l10n;
     try {
       await RemoteConsoleLauncher.open(
+        context: context,
         title: guest.type == 'qemu'
             ? l10n.vncTitle(guest.name)
             : l10n.terminalTitle(guest.name),

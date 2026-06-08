@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:pve_manager/l10n/generated/app_localizations.dart';
 import 'package:pve_manager/data/services/proxmox_client.dart';
 import 'package:pve_manager/data/services/proxmox_api_exception.dart';
+import 'package:pve_manager/view/remote_console_screen.dart';
 
 class RemoteConsoleLauncher {
   const RemoteConsoleLauncher._();
@@ -13,6 +15,7 @@ class RemoteConsoleLauncher {
   );
 
   static Future<void> open({
+    required BuildContext context,
     required String title,
     required Uri uri,
     required ProxmoxClient client,
@@ -48,10 +51,24 @@ class RemoteConsoleLauncher {
             message: error.message,
           );
         }
+      case TargetPlatform.windows:
+        await Navigator.of(context, rootNavigator: true).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => RemoteConsoleScreen(
+              title: title,
+              uri: uri,
+              authCookie: client.authCookieValue,
+              ignoreCertificateErrors: client.ignoreCertificateErrors,
+              loadFailedTemplate: l10n.consoleLoadFailed('{description}'),
+              unknownErrorMessage: l10n.unknownError,
+              certificateErrorMessage: l10n.consoleCertificateError,
+              errorHint: l10n.consoleErrorHint,
+            ),
+          ),
+        );
       case TargetPlatform.iOS:
       case TargetPlatform.macOS:
       case TargetPlatform.linux:
-      case TargetPlatform.windows:
       case TargetPlatform.fuchsia:
         throw const ProxmoxApiException(
           ProxmoxErrorCode.platformConsoleUnsupported,

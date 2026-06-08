@@ -148,6 +148,7 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
   Future<void> _openTerminal() async {
     try {
       await RemoteConsoleLauncher.open(
+        context: context,
         title: context.l10n.terminalTitle(widget.node.name),
         client: widget.client,
         uri: widget.client.nodeShellConsoleUri(widget.node.name),
