@@ -6,6 +6,7 @@ enum ProxmoxErrorCode {
   unsupportedResourceType,
   loginResponseInvalid,
   loginTicketMissing,
+  twoFactorRequired,
   nodeStatusInvalid,
   terminalSessionInvalid,
   guestActionOnly,
@@ -37,6 +38,7 @@ class ProxmoxApiException implements Exception {
       ProxmoxErrorCode.unsupportedResourceType => l10n.unsupportedResourceType,
       ProxmoxErrorCode.loginResponseInvalid => l10n.loginResponseInvalid,
       ProxmoxErrorCode.loginTicketMissing => l10n.loginTicketMissing,
+      ProxmoxErrorCode.twoFactorRequired => l10n.twoFactorRequired,
       ProxmoxErrorCode.nodeStatusInvalid => l10n.nodeStatusInvalid,
       ProxmoxErrorCode.terminalSessionInvalid => l10n.terminalSessionInvalid,
       ProxmoxErrorCode.guestActionOnly => l10n.guestActionOnly,
@@ -79,4 +81,17 @@ class ProxmoxApiException implements Exception {
 
   @override
   String toString() => message ?? code.name;
+}
+
+class ProxmoxTfaRequiredException extends ProxmoxApiException {
+  const ProxmoxTfaRequiredException({
+    this.challenge = const <String, Object?>{},
+  }) : super(ProxmoxErrorCode.twoFactorRequired);
+
+  final Map<String, Object?> challenge;
+
+  String? get ticket => challenge['ticket']?.toString();
+  String? get csrfToken => challenge['CSRFPreventionToken']?.toString();
+
+  bool get usesTicketChallenge => ticket?.contains(':!tfa!') ?? false;
 }

@@ -65,6 +65,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get confirm => '确定';
 
   @override
+  String get verify => '验证';
+
+  @override
   String get enable => '启用';
 
   @override
@@ -291,6 +294,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get allowSelfSignedCertificate => '允许自签名证书';
+
+  @override
+  String get twoFactorTitle => '需要二次验证';
+
+  @override
+  String get twoFactorCode => '验证码';
+
+  @override
+  String get twoFactorCodeHint => 'TOTP；恢复码请输入 recovery:xxxx';
+
+  @override
+  String get enterTwoFactorCode => '请输入验证码';
 
   @override
   String get enterProxmoxAddress => '请输入 Proxmox 地址';
@@ -570,6 +585,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get loginTicketMissing => '登录响应缺少票据，请检查账号或权限。';
+
+  @override
+  String get twoFactorRequired => '该账号需要二次验证。';
 
   @override
   String get nodeStatusInvalid => '节点状态响应格式异常。';

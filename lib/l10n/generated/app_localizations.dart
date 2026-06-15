@@ -206,6 +206,12 @@ abstract class AppLocalizations {
   /// **'确定'**
   String get confirm;
 
+  /// No description provided for @verify.
+  ///
+  /// In zh, this message translates to:
+  /// **'验证'**
+  String get verify;
+
   /// No description provided for @enable.
   ///
   /// In zh, this message translates to:
@@ -661,6 +667,30 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'允许自签名证书'**
   String get allowSelfSignedCertificate;
+
+  /// No description provided for @twoFactorTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'需要二次验证'**
+  String get twoFactorTitle;
+
+  /// No description provided for @twoFactorCode.
+  ///
+  /// In zh, this message translates to:
+  /// **'验证码'**
+  String get twoFactorCode;
+
+  /// No description provided for @twoFactorCodeHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'TOTP；恢复码请输入 recovery:xxxx'**
+  String get twoFactorCodeHint;
+
+  /// No description provided for @enterTwoFactorCode.
+  ///
+  /// In zh, this message translates to:
+  /// **'请输入验证码'**
+  String get enterTwoFactorCode;
 
   /// No description provided for @enterProxmoxAddress.
   ///
@@ -1171,6 +1201,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'登录响应缺少票据，请检查账号或权限。'**
   String get loginTicketMissing;
+
+  /// No description provided for @twoFactorRequired.
+  ///
+  /// In zh, this message translates to:
+  /// **'该账号需要二次验证。'**
+  String get twoFactorRequired;
 
   /// No description provided for @nodeStatusInvalid.
   ///

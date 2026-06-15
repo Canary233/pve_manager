@@ -65,6 +65,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get confirm => 'Confirm';
 
   @override
+  String get verify => 'Verify';
+
+  @override
   String get enable => 'Enable';
 
   @override
@@ -293,6 +296,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get allowSelfSignedCertificate => 'Allow self-signed certificate';
+
+  @override
+  String get twoFactorTitle => 'Two-factor authentication required';
+
+  @override
+  String get twoFactorCode => 'Verification code';
+
+  @override
+  String get twoFactorCodeHint => 'TOTP; use recovery:xxxx for a recovery code';
+
+  @override
+  String get enterTwoFactorCode => 'Enter the verification code';
 
   @override
   String get enterProxmoxAddress => 'Enter the Proxmox address';
@@ -581,6 +596,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get loginTicketMissing =>
       'Login response is missing a ticket. Check the account or permissions.';
+
+  @override
+  String get twoFactorRequired =>
+      'This account requires two-factor authentication.';
 
   @override
   String get nodeStatusInvalid => 'Unexpected node status response.';

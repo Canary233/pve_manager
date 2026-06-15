@@ -104,28 +104,64 @@ class ProxmoxClient {
     });
   }
 
-  Future<void> login() async {
+  Future<void> login({String? tfaChallenge, String? tfaResponse}) async {
     final response = await _request(
       'POST',
       '/access/ticket',
       body: {
         'username': username.contains('@') ? username : '$username@$realm',
-        'password': password,
+        'password': _ticketPassword(tfaResponse),
+        if (tfaChallenge?.trim().isNotEmpty ?? false)
+          'tfa-challenge': tfaChallenge!.trim(),
       },
       needsAuth: false,
     );
 
-    final data = response['data'];
-    if (data is! Map<String, dynamic>) {
-      throw const ProxmoxApiException(ProxmoxErrorCode.loginResponseInvalid);
+    final data = _loginData(response);
+
+    if (_boolValue(data['NeedTFA']) || _isTicketChallenge(data['ticket'])) {
+      throw ProxmoxTfaRequiredException(challenge: Map.of(data));
     }
 
-    _ticket = data['ticket']?.toString();
-    _csrfToken = data['CSRFPreventionToken']?.toString();
+    _storeLoginData(data);
+  }
 
-    if (_ticket == null || _csrfToken == null) {
+  Future<void> completeTwoFactor(
+    ProxmoxTfaRequiredException challenge,
+    String response,
+  ) async {
+    if (challenge.usesTicketChallenge) {
+      await login(tfaChallenge: challenge.ticket, tfaResponse: response);
+      return;
+    }
+
+    final temporaryTicket = challenge.ticket;
+    if (temporaryTicket == null || temporaryTicket.isEmpty) {
       throw const ProxmoxApiException(ProxmoxErrorCode.loginTicketMissing);
     }
+
+    final result = await _request(
+      'POST',
+      '/access/tfa',
+      body: {'response': response.trim()},
+      authTicket: temporaryTicket,
+      csrfToken: challenge.csrfToken,
+    );
+
+    final data = _loginData(result);
+    data['CSRFPreventionToken'] ??= challenge.csrfToken;
+    _storeLoginData(data);
+  }
+
+  String _ticketPassword(String? tfaResponse) {
+    final response = tfaResponse?.trim();
+    if (response == null || response.isEmpty) {
+      return password;
+    }
+    if (response.contains(':')) {
+      return response;
+    }
+    return 'totp:$response';
   }
 
   Future<List<PveResource>> getResources({String? type}) async {
@@ -287,10 +323,7 @@ class ProxmoxClient {
 
     final guestPath = _guestApiPath(guest);
     final path = '/nodes/${guest.node}/$guestPath/${guest.vmid}/config';
-    final response = await _request(
-      'GET',
-      path,
-    );
+    final response = await _request('GET', path);
     final data = response['data'];
 
     var editSchema = const GuestConfigEditSchema.unavailable();
@@ -544,6 +577,8 @@ class ProxmoxClient {
     Map<String, String>? body,
     Map<String, String>? queryParameters,
     bool needsAuth = true,
+    String? authTicket,
+    String? csrfToken,
   }) async {
     final uri = _apiUri(path, queryParameters: queryParameters);
     final request = await _httpClient
@@ -553,12 +588,14 @@ class ProxmoxClient {
     request.headers.set(HttpHeaders.acceptHeader, 'application/json');
 
     if (needsAuth) {
-      if (_ticket == null) {
+      final ticket = authTicket ?? _ticket;
+      if (ticket == null) {
         throw const ProxmoxApiException(ProxmoxErrorCode.sessionExpired);
       }
-      request.headers.set(HttpHeaders.cookieHeader, 'PVEAuthCookie=$_ticket');
-      if (method != 'GET' && _csrfToken != null) {
-        request.headers.set('CSRFPreventionToken', _csrfToken!);
+      request.headers.set(HttpHeaders.cookieHeader, 'PVEAuthCookie=$ticket');
+      final token = csrfToken ?? _csrfToken;
+      if (method != 'GET' && token != null) {
+        request.headers.set('CSRFPreventionToken', token);
       }
     }
 
@@ -619,6 +656,23 @@ class ProxmoxClient {
     return decoded;
   }
 
+  Map<String, dynamic> _loginData(Map<String, dynamic> response) {
+    final data = response['data'];
+    if (data is! Map<String, dynamic>) {
+      throw const ProxmoxApiException(ProxmoxErrorCode.loginResponseInvalid);
+    }
+    return data;
+  }
+
+  void _storeLoginData(Map<String, dynamic> data) {
+    _ticket = data['ticket']?.toString();
+    _csrfToken = data['CSRFPreventionToken']?.toString();
+
+    if (_ticket == null || _csrfToken == null) {
+      throw const ProxmoxApiException(ProxmoxErrorCode.loginTicketMissing);
+    }
+  }
+
   Uri _apiUri(String path, {Map<String, String>? queryParameters}) {
     final base = Uri.parse(origin);
     final apiPath = path.startsWith('/') ? path.substring(1) : path;
@@ -671,6 +725,21 @@ class ProxmoxClient {
       return value.round();
     }
     return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static bool _boolValue(Object? value) {
+    if (value is bool) {
+      return value;
+    }
+    if (value is num) {
+      return value != 0;
+    }
+    final normalized = value?.toString().toLowerCase();
+    return normalized == '1' || normalized == 'true' || normalized == 'yes';
+  }
+
+  static bool _isTicketChallenge(Object? value) {
+    return value?.toString().contains(':!tfa!') ?? false;
   }
 }
 
