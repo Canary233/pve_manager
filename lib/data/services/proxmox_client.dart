@@ -500,14 +500,47 @@ class ProxmoxClient {
   }
 
   Future<NodeTerminalSession> createNodeTerminalSession(String node) async {
-    final response = await _request('POST', '/nodes/$node/termproxy');
-    final data = response['data'];
+    return _createTerminalSession(nodeTerminalApiPath(node));
+  }
 
-    if (data is! Map<String, dynamic>) {
-      throw const ProxmoxApiException(ProxmoxErrorCode.terminalSessionInvalid);
+  Future<NodeTerminalSession> createGuestTerminalSession(
+    PveResource guest,
+  ) async {
+    return _createTerminalSession(guestTerminalApiPath(guest));
+  }
+
+  String nodeTerminalApiPath(String node) {
+    return '/nodes/$node';
+  }
+
+  String guestTerminalApiPath(PveResource guest) {
+    if (!guest.isGuest || guest.type != 'lxc') {
+      throw const ProxmoxApiException(ProxmoxErrorCode.guestActionOnly);
     }
 
-    return NodeTerminalSession.fromJson(data);
+    return '/nodes/${guest.node}/lxc/${guest.vmid}';
+  }
+
+  Future<ProxmoxTerminalConnection> connectTerminalWebSocket({
+    required String apiPath,
+    required NodeTerminalSession session,
+  }) async {
+    final client = _createHttpClient();
+    try {
+      final socket = await WebSocket.connect(
+        _terminalWebSocketUri(apiPath, session).toString(),
+        protocols: const <String>['binary'],
+        headers: <String, dynamic>{
+          HttpHeaders.cookieHeader: 'PVEAuthCookie=$authCookieValue',
+        },
+        customClient: client,
+      ).timeout(_requestTimeout);
+
+      return ProxmoxTerminalConnection(socket, client);
+    } on Object {
+      client.close(force: true);
+      rethrow;
+    }
   }
 
   Future<void> executeNodePowerAction(
@@ -569,6 +602,17 @@ class ProxmoxClient {
 
   void close() {
     _httpClient.close(force: true);
+  }
+
+  Future<NodeTerminalSession> _createTerminalSession(String apiPath) async {
+    final response = await _request('POST', '$apiPath/termproxy');
+    final data = response['data'];
+
+    if (data is! Map<String, dynamic>) {
+      throw const ProxmoxApiException(ProxmoxErrorCode.terminalSessionInvalid);
+    }
+
+    return NodeTerminalSession.fromJson(data);
   }
 
   Future<Map<String, dynamic>> _request(
@@ -700,6 +744,33 @@ class ProxmoxClient {
     );
   }
 
+  Uri _terminalWebSocketUri(String apiPath, NodeTerminalSession session) {
+    final base = Uri.parse(origin);
+    final normalizedPath = apiPath.startsWith('/')
+        ? apiPath.substring(1)
+        : apiPath;
+    return Uri(
+      scheme: base.scheme == 'https' ? 'wss' : 'ws',
+      host: base.host,
+      port: base.hasPort ? base.port : null,
+      pathSegments: [
+        'api2',
+        'json',
+        ...normalizedPath.split('/').where((segment) => segment.isNotEmpty),
+        'vncwebsocket',
+      ],
+      queryParameters: {'port': '${session.port}', 'vncticket': session.ticket},
+    );
+  }
+
+  HttpClient _createHttpClient() {
+    return HttpClient()
+      ..connectionTimeout = const Duration(seconds: 15)
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) =>
+              ignoreCertificateErrors;
+  }
+
   static int _typeRank(String type) {
     return switch (type) {
       'node' => 0,
@@ -748,4 +819,23 @@ class _ApiResponse {
 
   final Map<String, dynamic> body;
   final bool usedFallback;
+}
+
+class ProxmoxTerminalConnection {
+  ProxmoxTerminalConnection(this.socket, this._httpClient);
+
+  final WebSocket socket;
+  final HttpClient _httpClient;
+
+  Future<void> close([int? code, String? reason]) async {
+    try {
+      await socket.close(code, reason);
+    } finally {
+      _httpClient.close(force: true);
+    }
+  }
+
+  void dispose() {
+    _httpClient.close(force: true);
+  }
 }

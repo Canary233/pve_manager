@@ -357,133 +357,13 @@ class _HomeScreenState extends State<HomeScreen> {
     required ProxmoxClient client,
     required ProxmoxTfaRequiredException challenge,
   }) async {
-    final controller = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final l10n = context.l10n;
-
-    try {
-      final result = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) {
-          var isSubmitting = false;
-          String? submitError;
-
-          Future<void> submit(StateSetter setDialogState) async {
-            if (isSubmitting || !(formKey.currentState?.validate() ?? false)) {
-              return;
-            }
-
-            setDialogState(() {
-              isSubmitting = true;
-              submitError = null;
-            });
-
-            try {
-              await client.completeTwoFactor(challenge, controller.text.trim());
-              if (!context.mounted) {
-                return;
-              }
-              Navigator.of(context).pop(true);
-            } on Object catch (error) {
-              if (!context.mounted) {
-                return;
-              }
-              setDialogState(() {
-                submitError = localizedError(l10n, error);
-                isSubmitting = false;
-              });
-            }
-          }
-
-          return StatefulBuilder(
-            builder: (context, setDialogState) {
-              return AlertDialog(
-                title: Text(l10n.twoFactorTitle),
-                content: Form(
-                  key: formKey,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 360),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextFormField(
-                          controller: controller,
-                          autofocus: true,
-                          enabled: !isSubmitting,
-                          autofillHints: const [AutofillHints.oneTimeCode],
-                          decoration: InputDecoration(
-                            labelText: l10n.twoFactorCode,
-                            hintText: l10n.twoFactorCodeHint,
-                            prefixIcon: const Icon(Icons.pin_rounded),
-                          ),
-                          keyboardType: TextInputType.text,
-                          textInputAction: TextInputAction.done,
-                          onFieldSubmitted: (_) {
-                            unawaited(submit(setDialogState));
-                          },
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return l10n.enterTwoFactorCode;
-                            }
-                            return null;
-                          },
-                        ),
-                        if (submitError != null) ...[
-                          const SizedBox(height: 12),
-                          Text(
-                            submitError!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: isSubmitting
-                        ? null
-                        : () => Navigator.of(context).pop(false),
-                    child: Text(l10n.cancel),
-                  ),
-                  FilledButton(
-                    onPressed: isSubmitting
-                        ? null
-                        : () => unawaited(submit(setDialogState)),
-                    child: isSubmitting
-                        ? Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onPrimary,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(l10n.verify),
-                            ],
-                          )
-                        : Text(l10n.verify),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      );
-      return result ?? false;
-    } finally {
-      controller.dispose();
-    }
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) =>
+          _TwoFactorDialog(client: client, challenge: challenge),
+    );
+    return result ?? false;
   }
 
   Object _serverKey(PveServerConfig server) {
@@ -567,6 +447,135 @@ class _HomeScreenState extends State<HomeScreen> {
         onPressed: () => _openServerForm(),
         child: const Icon(Icons.add_rounded),
       ),
+    );
+  }
+}
+
+class _TwoFactorDialog extends StatefulWidget {
+  const _TwoFactorDialog({required this.client, required this.challenge});
+
+  final ProxmoxClient client;
+  final ProxmoxTfaRequiredException challenge;
+
+  @override
+  State<_TwoFactorDialog> createState() => _TwoFactorDialogState();
+}
+
+class _TwoFactorDialogState extends State<_TwoFactorDialog> {
+  final _controller = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  bool _isSubmitting = false;
+  String? _submitError;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_isSubmitting || !(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _submitError = null;
+    });
+
+    try {
+      await widget.client.completeTwoFactor(
+        widget.challenge,
+        _controller.text.trim(),
+      );
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pop(true);
+    } on Object catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _submitError = localizedError(context.l10n, error);
+        _isSubmitting = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
+    return AlertDialog(
+      title: Text(l10n.twoFactorTitle),
+      content: Form(
+        key: _formKey,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _controller,
+                autofocus: true,
+                enabled: !_isSubmitting,
+                autofillHints: const [AutofillHints.oneTimeCode],
+                decoration: InputDecoration(
+                  labelText: l10n.twoFactorCode,
+                  hintText: l10n.twoFactorCodeHint,
+                  prefixIcon: const Icon(Icons.pin_rounded),
+                ),
+                keyboardType: TextInputType.text,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => unawaited(_submit()),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return l10n.enterTwoFactorCode;
+                  }
+                  return null;
+                },
+              ),
+              if (_submitError != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _submitError!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSubmitting
+              ? null
+              : () => Navigator.of(context).pop(false),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: _isSubmitting ? null : () => unawaited(_submit()),
+          child: _isSubmitting
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Theme.of(context).colorScheme.onPrimary,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(l10n.verify),
+                  ],
+                )
+              : Text(l10n.verify),
+        ),
+      ],
     );
   }
 }

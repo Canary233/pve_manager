@@ -14,6 +14,7 @@ import 'package:pve_manager/core/widgets/status_pill.dart';
 import 'package:pve_manager/core/widgets/usage_line.dart';
 import 'package:pve_manager/core/widgets/performance_history_card.dart';
 import 'package:pve_manager/view/guest/guest_config_screen.dart';
+import 'package:pve_manager/view/local_terminal_screen.dart';
 
 class GuestDetailScreen extends StatefulWidget {
   const GuestDetailScreen({
@@ -143,6 +144,19 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
     final guest = widget.guest;
     final l10n = context.l10n;
     try {
+      if (guest.type == 'lxc') {
+        await Navigator.of(context, rootNavigator: true).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => LocalTerminalScreen.guest(
+              title: l10n.terminalTitle(guest.name),
+              client: widget.client,
+              guest: guest,
+            ),
+          ),
+        );
+        return;
+      }
+
       await RemoteConsoleLauncher.open(
         context: context,
         title: guest.type == 'qemu'

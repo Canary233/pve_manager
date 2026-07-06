@@ -20,6 +20,7 @@ class RemoteConsoleLauncher {
     required Uri uri,
     required ProxmoxClient client,
     required AppLocalizations l10n,
+    bool terminalMode = false,
   }) async {
     if (kIsWeb) {
       throw const ProxmoxApiException(ProxmoxErrorCode.webConsoleUnsupported);
@@ -33,6 +34,7 @@ class RemoteConsoleLauncher {
             'url': uri.toString(),
             'cookieDomain': client.host,
             'authCookie': client.authCookieValue,
+            'terminalMode': terminalMode,
             'ignoreCertificateErrors': client.ignoreCertificateErrors,
             'fallbackTitle': l10n.consoleFallbackTitle,
             'invalidArgumentsMessage': l10n.consoleInvalidArguments,
@@ -58,6 +60,7 @@ class RemoteConsoleLauncher {
               title: title,
               uri: uri,
               authCookie: client.authCookieValue,
+              terminalMode: terminalMode,
               ignoreCertificateErrors: client.ignoreCertificateErrors,
               loadFailedTemplate: l10n.consoleLoadFailed('{description}'),
               unknownErrorMessage: l10n.unknownError,

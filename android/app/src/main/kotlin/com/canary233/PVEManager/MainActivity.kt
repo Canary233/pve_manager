@@ -1,6 +1,7 @@
 package com.canary233.PVEManager
 
 import android.content.Intent
+import android.widget.Toast
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -39,6 +40,10 @@ class MainActivity : FlutterActivity() {
                 putExtra(RemoteConsoleActivity.EXTRA_COOKIE_DOMAIN, cookieDomain)
                 putExtra(RemoteConsoleActivity.EXTRA_AUTH_COOKIE, authCookie)
                 putExtra(
+                    RemoteConsoleActivity.EXTRA_TERMINAL_MODE,
+                    call.argument<Boolean>("terminalMode") ?: false
+                )
+                putExtra(
                     RemoteConsoleActivity.EXTRA_LOAD_FAILED_TEMPLATE,
                     call.argument<String>("loadFailedTemplate")
                 )
@@ -57,6 +62,25 @@ class MainActivity : FlutterActivity() {
                 )
             }
             startActivity(intent)
+            result.success(null)
+        }
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "pve_manager/toast"
+        ).setMethodCallHandler { call, result ->
+            if (call.method != "show") {
+                result.notImplemented()
+                return@setMethodCallHandler
+            }
+
+            val message = call.argument<String>("message")
+            if (message.isNullOrBlank()) {
+                result.error("INVALID_ARGUMENT", "Toast message is required.", null)
+                return@setMethodCallHandler
+            }
+
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
             result.success(null)
         }
     }

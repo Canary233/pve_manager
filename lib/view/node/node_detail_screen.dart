@@ -9,11 +9,11 @@ import 'package:pve_manager/data/models/node_rrd_point.dart';
 import 'package:pve_manager/data/models/node_status.dart';
 import 'package:pve_manager/data/models/pve_node.dart';
 import 'package:pve_manager/data/services/proxmox_client.dart';
-import 'package:pve_manager/data/services/remote_console_launcher.dart';
 import 'package:pve_manager/core/utils/formatters.dart';
 import 'package:pve_manager/core/widgets/error_state.dart';
 import 'package:pve_manager/core/widgets/usage_line.dart';
 import 'package:pve_manager/core/widgets/performance_history_card.dart';
+import 'package:pve_manager/view/local_terminal_screen.dart';
 import 'package:pve_manager/view/node/node_tasks_logs_screen.dart';
 
 class NodeDetailScreen extends StatefulWidget {
@@ -147,12 +147,14 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
 
   Future<void> _openTerminal() async {
     try {
-      await RemoteConsoleLauncher.open(
-        context: context,
-        title: context.l10n.terminalTitle(widget.node.name),
-        client: widget.client,
-        uri: widget.client.nodeShellConsoleUri(widget.node.name),
-        l10n: context.l10n,
+      await Navigator.of(context, rootNavigator: true).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => LocalTerminalScreen.node(
+            title: context.l10n.terminalTitle(widget.node.name),
+            client: widget.client,
+            node: widget.node.name,
+          ),
+        ),
       );
       if (mounted) {
         await _refresh();
