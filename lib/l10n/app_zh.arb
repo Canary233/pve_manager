@@ -175,6 +175,67 @@
   "kernelVersion": "内核版本",
   "uptime": "运行时间",
   "loadAverage": "系统负载",
+  "temperature": "温度",
+  "cpuFrequencyGhz": "CPU频率(GHz)",
+  "cpuTemperature": "CPU温度",
+  "cpuFrequencyValue": "{cores}核心 | 平均: {ghz} GHz",
+  "@cpuFrequencyValue": {
+    "placeholders": {
+      "cores": {
+        "type": "int"
+      },
+      "ghz": {}
+    }
+  },
+  "cpuFrequencyCurrentValue": "平均: {ghz} GHz",
+  "@cpuFrequencyCurrentValue": {
+    "placeholders": {
+      "ghz": {}
+    }
+  },
+  "cpuPackageTemperature": "封装: {temperature}",
+  "@cpuPackageTemperature": {
+    "placeholders": {
+      "temperature": {}
+    }
+  },
+  "cpuCoreTemperature": "核心: 平均 {average} ({range})",
+  "@cpuCoreTemperature": {
+    "placeholders": {
+      "average": {},
+      "range": {}
+    }
+  },
+  "temperatureValue": "温度: {temperature}",
+  "@temperatureValue": {
+    "placeholders": {
+      "temperature": {}
+    }
+  },
+  "nvmeDiskLabel": "NVME{index}",
+  "@nvmeDiskLabel": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "sataDiskLabel": "SATA{index}",
+  "@sataDiskLabel": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "solidStateDiskLabel": "固态硬盘{index}",
+  "@solidStateDiskLabel": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
   "memory": "内存",
   "disk": "磁盘",
   "swap": "交换分区",

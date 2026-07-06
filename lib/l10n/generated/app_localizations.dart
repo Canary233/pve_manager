@@ -884,6 +884,72 @@ abstract class AppLocalizations {
   /// **'系统负载'**
   String get loadAverage;
 
+  /// No description provided for @temperature.
+  ///
+  /// In zh, this message translates to:
+  /// **'温度'**
+  String get temperature;
+
+  /// No description provided for @cpuFrequencyGhz.
+  ///
+  /// In zh, this message translates to:
+  /// **'CPU频率(GHz)'**
+  String get cpuFrequencyGhz;
+
+  /// No description provided for @cpuTemperature.
+  ///
+  /// In zh, this message translates to:
+  /// **'CPU温度'**
+  String get cpuTemperature;
+
+  /// No description provided for @cpuFrequencyValue.
+  ///
+  /// In zh, this message translates to:
+  /// **'{cores}核心 | 平均: {ghz} GHz'**
+  String cpuFrequencyValue(int cores, Object ghz);
+
+  /// No description provided for @cpuFrequencyCurrentValue.
+  ///
+  /// In zh, this message translates to:
+  /// **'平均: {ghz} GHz'**
+  String cpuFrequencyCurrentValue(Object ghz);
+
+  /// No description provided for @cpuPackageTemperature.
+  ///
+  /// In zh, this message translates to:
+  /// **'封装: {temperature}'**
+  String cpuPackageTemperature(Object temperature);
+
+  /// No description provided for @cpuCoreTemperature.
+  ///
+  /// In zh, this message translates to:
+  /// **'核心: 平均 {average} ({range})'**
+  String cpuCoreTemperature(Object average, Object range);
+
+  /// No description provided for @temperatureValue.
+  ///
+  /// In zh, this message translates to:
+  /// **'温度: {temperature}'**
+  String temperatureValue(Object temperature);
+
+  /// No description provided for @nvmeDiskLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'NVME{index}'**
+  String nvmeDiskLabel(int index);
+
+  /// No description provided for @sataDiskLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'SATA{index}'**
+  String sataDiskLabel(int index);
+
+  /// No description provided for @solidStateDiskLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'固态硬盘{index}'**
+  String solidStateDiskLabel(int index);
+
   /// No description provided for @memory.
   ///
   /// In zh, this message translates to:

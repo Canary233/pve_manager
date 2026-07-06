@@ -416,6 +416,55 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loadAverage => 'Load average';
 
   @override
+  String get temperature => 'Temperature';
+
+  @override
+  String get cpuFrequencyGhz => 'CPU frequency (GHz)';
+
+  @override
+  String get cpuTemperature => 'CPU temperature';
+
+  @override
+  String cpuFrequencyValue(int cores, Object ghz) {
+    return '$cores cores | Avg: $ghz GHz';
+  }
+
+  @override
+  String cpuFrequencyCurrentValue(Object ghz) {
+    return 'Avg: $ghz GHz';
+  }
+
+  @override
+  String cpuPackageTemperature(Object temperature) {
+    return 'Package: $temperature';
+  }
+
+  @override
+  String cpuCoreTemperature(Object average, Object range) {
+    return 'Cores: Avg $average ($range)';
+  }
+
+  @override
+  String temperatureValue(Object temperature) {
+    return 'Temperature: $temperature';
+  }
+
+  @override
+  String nvmeDiskLabel(int index) {
+    return 'NVME$index';
+  }
+
+  @override
+  String sataDiskLabel(int index) {
+    return 'SATA$index';
+  }
+
+  @override
+  String solidStateDiskLabel(int index) {
+    return 'SSD$index';
+  }
+
+  @override
   String get memory => 'Memory';
 
   @override

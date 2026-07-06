@@ -89,6 +89,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final resources = resourcesResult.resources;
     final nodesResult = await _loadNodes();
     final baseNodes = nodesResult.nodes;
+    widget.client.preloadNodeThermalStates(baseNodes.map((node) => node.name));
     final clusterStatus = await _loadClusterStatus();
     final storagePermissionDenied = resourcesResult.fullResourceAccessDenied
         ? await _isStoragePermissionDenied()

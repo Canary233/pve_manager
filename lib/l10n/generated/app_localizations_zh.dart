@@ -414,6 +414,55 @@ class AppLocalizationsZh extends AppLocalizations {
   String get loadAverage => '系统负载';
 
   @override
+  String get temperature => '温度';
+
+  @override
+  String get cpuFrequencyGhz => 'CPU频率(GHz)';
+
+  @override
+  String get cpuTemperature => 'CPU温度';
+
+  @override
+  String cpuFrequencyValue(int cores, Object ghz) {
+    return '$cores核心 | 平均: $ghz GHz';
+  }
+
+  @override
+  String cpuFrequencyCurrentValue(Object ghz) {
+    return '平均: $ghz GHz';
+  }
+
+  @override
+  String cpuPackageTemperature(Object temperature) {
+    return '封装: $temperature';
+  }
+
+  @override
+  String cpuCoreTemperature(Object average, Object range) {
+    return '核心: 平均 $average ($range)';
+  }
+
+  @override
+  String temperatureValue(Object temperature) {
+    return '温度: $temperature';
+  }
+
+  @override
+  String nvmeDiskLabel(int index) {
+    return 'NVME$index';
+  }
+
+  @override
+  String sataDiskLabel(int index) {
+    return 'SATA$index';
+  }
+
+  @override
+  String solidStateDiskLabel(int index) {
+    return '固态硬盘$index';
+  }
+
+  @override
   String get memory => '内存';
 
   @override

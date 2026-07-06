@@ -9,6 +9,7 @@ import 'package:pve_manager/data/models/node_rrd_point.dart';
 import 'package:pve_manager/data/models/node_status.dart';
 import 'package:pve_manager/data/models/pve_node.dart';
 import 'package:pve_manager/data/services/proxmox_client.dart';
+import 'package:pve_manager/l10n/generated/app_localizations.dart';
 import 'package:pve_manager/core/utils/formatters.dart';
 import 'package:pve_manager/core/widgets/error_state.dart';
 import 'package:pve_manager/core/widgets/usage_line.dart';
@@ -38,7 +39,10 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
   late Future<_NodeDetailData> _detailFuture;
   Timer? _refreshTimer;
   bool _isDetailLoading = false;
+  bool _isExtendedThermalLoading = false;
+  int _extendedThermalGeneration = 0;
   _NodeDetailData? _lastDetailData;
+  NodeThermalState? _extendedThermalState;
   String _timeframe = 'hour';
 
   static const _timeframes = <String>['hour', 'day', 'week', 'month', 'year'];
@@ -54,6 +58,13 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
   @override
   void didUpdateWidget(NodeDetailScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.node.name != widget.node.name ||
+        oldWidget.client != widget.client) {
+      _extendedThermalGeneration++;
+      _isExtendedThermalLoading = false;
+      _extendedThermalState = null;
+      _detailFuture = _loadDetailTracked();
+    }
     if (oldWidget.autoRefreshIntervalListenable !=
         widget.autoRefreshIntervalListenable) {
       oldWidget.autoRefreshIntervalListenable.removeListener(
@@ -87,12 +98,25 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       widget.client.getNodeStatus(widget.node.name),
       widget.client.getNodeRrdData(widget.node.name, timeframe: _timeframe),
     ]);
+    final status = results[0] as NodeStatus;
+    final cachedExtendedThermalState =
+        _extendedThermalState ??
+        widget.client.cachedNodeThermalState(widget.node.name);
+    if (_extendedThermalState == null && cachedExtendedThermalState != null) {
+      _extendedThermalState = cachedExtendedThermalState;
+    }
+    final thermalState =
+        cachedExtendedThermalState == null || cachedExtendedThermalState.isEmpty
+        ? status.thermalState
+        : cachedExtendedThermalState;
 
     final detail = _NodeDetailData(
-      status: results[0] as NodeStatus,
+      status: status,
+      thermalState: thermalState,
       rrdPoints: results[1] as List<NodeRrdPoint>,
     );
     _lastDetailData = detail;
+    _loadExtendedThermalStateInBackground(thermalState);
     return detail;
   }
 
@@ -119,6 +143,50 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
       await future;
     } on Object {
       // FutureBuilder renders the error state when there is no cached detail.
+    }
+  }
+
+  void _loadExtendedThermalStateInBackground(
+    NodeThermalState visibleThermalState,
+  ) {
+    if (!_shouldLoadExtendedThermalState(visibleThermalState) ||
+        _isExtendedThermalLoading) {
+      return;
+    }
+
+    _isExtendedThermalLoading = true;
+    final generation = ++_extendedThermalGeneration;
+    unawaited(_loadExtendedThermalState(generation));
+  }
+
+  Future<void> _loadExtendedThermalState(int generation) async {
+    try {
+      final extendedThermalState = await widget.client.getNodeThermalState(
+        widget.node.name,
+      );
+      if (!mounted ||
+          generation != _extendedThermalGeneration ||
+          extendedThermalState.isEmpty) {
+        return;
+      }
+
+      _extendedThermalState = extendedThermalState;
+      final lastDetailData = _lastDetailData;
+      if (lastDetailData != null) {
+        final updatedDetailData = lastDetailData.copyWith(
+          thermalState: extendedThermalState,
+        );
+        _lastDetailData = updatedDetailData;
+        _detailFuture = Future<_NodeDetailData>.value(updatedDetailData);
+      }
+    } on Object {
+      // Extended SMART temperatures are best-effort and should not block details.
+    } finally {
+      if (mounted && generation == _extendedThermalGeneration) {
+        setState(() {
+          _isExtendedThermalLoading = false;
+        });
+      }
     }
   }
 
@@ -288,7 +356,13 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                _SystemInfoCard(status: detailData.status),
+                _SystemInfoCard(
+                  status: detailData.status,
+                  thermalState: detailData.thermalState,
+                  isDiskDetailsLoading:
+                      _isExtendedThermalLoading &&
+                      _shouldLoadExtendedThermalState(detailData.thermalState),
+                ),
                 const SizedBox(height: 16),
                 _ResourceUsageCard(status: detailData.status),
                 const SizedBox(height: 16),
@@ -324,17 +398,51 @@ class _NodeDetailScreenState extends State<NodeDetailScreen> {
   }
 }
 
+bool _shouldLoadExtendedThermalState(NodeThermalState thermalState) {
+  if (thermalState.isEmpty) {
+    return true;
+  }
+
+  final diskTemperatures = thermalState.diskTemperatures;
+  if (diskTemperatures.isEmpty) {
+    return true;
+  }
+
+  return !diskTemperatures.any(
+    (disk) => disk.type == NodeDiskTemperatureType.sata,
+  );
+}
+
 class _NodeDetailData {
-  const _NodeDetailData({required this.status, required this.rrdPoints});
+  const _NodeDetailData({
+    required this.status,
+    required this.thermalState,
+    required this.rrdPoints,
+  });
 
   final NodeStatus status;
+  final NodeThermalState thermalState;
   final List<NodeRrdPoint> rrdPoints;
+
+  _NodeDetailData copyWith({NodeThermalState? thermalState}) {
+    return _NodeDetailData(
+      status: status,
+      thermalState: thermalState ?? this.thermalState,
+      rrdPoints: rrdPoints,
+    );
+  }
 }
 
 class _SystemInfoCard extends StatelessWidget {
-  const _SystemInfoCard({required this.status});
+  const _SystemInfoCard({
+    required this.status,
+    required this.thermalState,
+    required this.isDiskDetailsLoading,
+  });
 
   final NodeStatus status;
+  final NodeThermalState thermalState;
+  final bool isDiskDetailsLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -347,13 +455,14 @@ class _SystemInfoCard extends StatelessWidget {
               .take(3)
               .map((value) => value.toStringAsFixed(2))
               .join('  ');
+    final diskTemperatures = thermalState.diskTemperatures;
 
     return _DetailCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _CardTitle(title: l10n.systemInfo),
-          const Divider(height: 24),
+          const SizedBox(height: 20),
           if (cpuModel != null)
             _InfoRow(label: l10n.processor, value: cpuModel),
           _InfoRow(
@@ -371,10 +480,148 @@ class _SystemInfoCard extends StatelessWidget {
           ),
           _InfoRow(label: l10n.uptime, value: uptime(l10n, status.uptime)),
           _InfoRow(label: l10n.loadAverage, value: loadAverage),
+          _InfoRow(
+            label: l10n.cpuFrequencyGhz,
+            value: _formatCpuFrequency(l10n, cpuInfo),
+          ),
+          _InfoRow(
+            label: l10n.cpuTemperature,
+            value: _formatCpuTemperature(l10n, thermalState),
+          ),
+          _DiskTemperatureRows(
+            diskTemperatures: diskTemperatures,
+            isLoading: isDiskDetailsLoading,
+          ),
         ],
       ),
     );
   }
+}
+
+class _DiskTemperatureRows extends StatelessWidget {
+  const _DiskTemperatureRows({
+    required this.diskTemperatures,
+    required this.isLoading,
+  });
+
+  final List<NodeDiskTemperature> diskTemperatures;
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final visibleDiskTemperatures = isLoading
+        ? const <NodeDiskTemperature>[]
+        : diskTemperatures;
+    final rows = <Widget>[
+      ...visibleDiskTemperatures.map(
+        (disk) => _DiskTemperatureRow(
+          label: _diskTemperatureLabel(l10n, disk),
+          value: l10n.temperatureValue(disk.formatTemperature()),
+        ),
+      ),
+      if (isLoading) _DiskDetailsLoadingRow(label: l10n.disk),
+    ];
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 260),
+      reverseDuration: const Duration(milliseconds: 180),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SizeTransition(
+            sizeFactor: animation,
+            alignment: Alignment.topCenter,
+            child: child,
+          ),
+        );
+      },
+      child: Column(
+        key: ValueKey<String>(_diskRowsKey(visibleDiskTemperatures, isLoading)),
+        children: rows,
+      ),
+    );
+  }
+}
+
+String _diskRowsKey(
+  List<NodeDiskTemperature> diskTemperatures,
+  bool isLoading,
+) {
+  final rowsKey = diskTemperatures
+      .map((disk) => '${disk.type.name}:${disk.index}:${disk.model ?? ''}')
+      .join('|');
+  return '$isLoading:$rowsKey';
+}
+
+String _formatCpuFrequency(AppLocalizations l10n, CpuInfo? cpuInfo) {
+  final mhz = cpuInfo?.mhz;
+  if (mhz == null || mhz <= 0) {
+    return '-';
+  }
+
+  final ghz = (mhz / 1000).toStringAsFixed(2);
+  final cores = cpuInfo?.cores ?? 0;
+  if (cores > 0) {
+    return l10n.cpuFrequencyValue(cores, ghz);
+  }
+  return l10n.cpuFrequencyCurrentValue(ghz);
+}
+
+String _formatCpuTemperature(
+  AppLocalizations l10n,
+  NodeThermalState thermalState,
+) {
+  final values = <String>[];
+  final packageSensor = thermalState.cpuPackageSensor;
+  if (packageSensor != null) {
+    values.add(l10n.cpuPackageTemperature(packageSensor.formatTemperature()));
+  }
+
+  final coreSensors = thermalState.cpuCoreSensors;
+  if (coreSensors.isNotEmpty) {
+    final coreTemperatures = coreSensors.map((sensor) => sensor.celsius);
+    final average =
+        coreTemperatures.reduce((sum, value) => sum + value) /
+        coreSensors.length;
+    final min = coreTemperatures.reduce((a, b) => a < b ? a : b);
+    final max = coreTemperatures.reduce((a, b) => a > b ? a : b);
+    values.add(
+      l10n.cpuCoreTemperature(
+        NodeTemperatureSensor(
+          label: 'Temperature',
+          celsius: average,
+        ).formatTemperature(),
+        '${NodeTemperatureSensor(label: 'Temperature', celsius: min).formatTemperature()}~'
+        '${NodeTemperatureSensor(label: 'Temperature', celsius: max).formatTemperature()}',
+      ),
+    );
+  }
+
+  if (values.isEmpty) {
+    final primarySensor = thermalState.primaryCpuSensor;
+    if (primarySensor == null) {
+      return '-';
+    }
+    return l10n.temperatureValue(primarySensor.formatTemperature());
+  }
+
+  return values.join(' | ');
+}
+
+String _diskTemperatureLabel(AppLocalizations l10n, NodeDiskTemperature disk) {
+  final model = disk.model?.trim();
+  if (model != null && model.isNotEmpty) {
+    return model;
+  }
+
+  return switch (disk.type) {
+    NodeDiskTemperatureType.nvme => l10n.nvmeDiskLabel(disk.index),
+    NodeDiskTemperatureType.sata => l10n.sataDiskLabel(disk.index),
+    NodeDiskTemperatureType.ssd => l10n.solidStateDiskLabel(disk.index),
+  };
 }
 
 class _ResourceUsageCard extends StatelessWidget {
@@ -528,6 +775,95 @@ class _InfoRow extends StatelessWidget {
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DiskTemperatureRow extends StatelessWidget {
+  const _DiskTemperatureRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final labelStyle = theme.textTheme.titleMedium?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+      fontWeight: FontWeight.w700,
+    );
+    final valueStyle = theme.textTheme.titleMedium?.copyWith(
+      fontWeight: FontWeight.w700,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+              style: labelStyle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.visible,
+            softWrap: false,
+            textAlign: TextAlign.right,
+            style: valueStyle,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DiskDetailsLoadingRow extends StatelessWidget {
+  const _DiskDetailsLoadingRow({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 132),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    minHeight: 4,
+                    backgroundColor: colorScheme.surfaceContainerHighest,
+                  ),
+                ),
+              ),
             ),
           ),
         ],

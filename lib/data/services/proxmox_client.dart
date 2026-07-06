@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -39,8 +40,15 @@ class ProxmoxClient {
   final HttpClient _httpClient;
   String? _ticket;
   String? _csrfToken;
+  final Map<String, NodeThermalState> _nodeThermalStateCache =
+      <String, NodeThermalState>{};
+  final Map<String, Future<NodeThermalState>> _nodeThermalStateRequests =
+      <String, Future<NodeThermalState>>{};
 
   static const Duration _requestTimeout = Duration(seconds: 12);
+  static const Duration _terminalCommandTimeout = Duration(seconds: 20);
+  static const String _temperatureStartMarker = '__PVE_MANAGER_TEMP_START__';
+  static const String _temperatureEndMarker = '__PVE_MANAGER_TEMP_END__';
 
   String get displayHost => Uri.parse(origin).host;
   bool get hasActiveSession => _ticket != null;
@@ -233,6 +241,74 @@ class ProxmoxClient {
     }
 
     return NodeStatus.fromJson(data);
+  }
+
+  Future<NodeThermalState> getNodeThermalState(String node) async {
+    final cached = _nodeThermalStateCache[node];
+    if (cached != null && !cached.isEmpty) {
+      return cached;
+    }
+
+    final pending = _nodeThermalStateRequests[node];
+    if (pending != null) {
+      return pending;
+    }
+
+    final request = _fetchNodeThermalState(node);
+    _nodeThermalStateRequests[node] = request;
+    return request;
+  }
+
+  NodeThermalState? cachedNodeThermalState(String node) {
+    final cached = _nodeThermalStateCache[node];
+    if (cached == null || cached.isEmpty) {
+      return null;
+    }
+    return cached;
+  }
+
+  void preloadNodeThermalStates(Iterable<String> nodes) {
+    final uniqueNodes = nodes
+        .map((node) => node.trim())
+        .where((node) => node.isNotEmpty)
+        .toSet();
+
+    for (final node in uniqueNodes) {
+      if (_nodeThermalStateCache.containsKey(node) ||
+          _nodeThermalStateRequests.containsKey(node)) {
+        continue;
+      }
+      unawaited(
+        getNodeThermalState(node).catchError((Object _) {
+          return const NodeThermalState.empty();
+        }),
+      );
+    }
+  }
+
+  Future<void> preloadClusterNodeThermalStates() async {
+    try {
+      final nodes = await getNodes();
+      preloadNodeThermalStates(nodes.map((node) => node.name));
+    } on Object {
+      // SMART details are optional; connection should not wait on preloading.
+    }
+  }
+
+  Future<NodeThermalState> _fetchNodeThermalState(String node) async {
+    try {
+      final output = await _runNodeShellCommand(
+        node,
+        _nodeTemperatureCommand(),
+      );
+      final thermalState = NodeThermalState.fromJson(output);
+      if (!thermalState.isEmpty) {
+        _nodeThermalStateCache[node] = thermalState;
+      }
+      return thermalState;
+    } finally {
+      _nodeThermalStateRequests.remove(node);
+    }
   }
 
   Future<List<NodeRrdPoint>> getNodeRrdData(
@@ -543,6 +619,72 @@ class ProxmoxClient {
     }
   }
 
+  Future<String> _runNodeShellCommand(String node, String command) async {
+    final session = await createNodeTerminalSession(node);
+    final connection = await connectTerminalWebSocket(
+      apiPath: nodeTerminalApiPath(node),
+      session: session,
+    );
+    StreamSubscription<dynamic>? subscription;
+
+    try {
+      final completer = Completer<String>();
+      final output = StringBuffer();
+      var authenticated = false;
+
+      subscription = connection.socket.listen(
+        (message) {
+          final text = _decodeTerminalMessage(message);
+          if (text.isEmpty || completer.isCompleted) {
+            return;
+          }
+
+          if (!authenticated) {
+            final okIndex = text.indexOf('OK');
+            if (okIndex == -1) {
+              return;
+            }
+
+            authenticated = true;
+            final remaining = text.substring(okIndex + 2);
+            if (remaining.isNotEmpty) {
+              output.write(remaining);
+            }
+            connection.socket.add('1:160:40:');
+            final input = '$command\r';
+            connection.socket.add('0:${utf8.encode(input).length}:$input');
+            return;
+          }
+
+          output.write(text);
+          if (_hasTerminalMarkerLine(
+            output.toString(),
+            _temperatureEndMarker,
+          )) {
+            completer.complete(output.toString());
+          }
+        },
+        onDone: () {
+          if (!completer.isCompleted) {
+            completer.complete(output.toString());
+          }
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          if (!completer.isCompleted) {
+            completer.completeError(error, stackTrace);
+          }
+        },
+      );
+
+      connection.socket.add('${session.user}:${session.ticket}\n');
+      final rawOutput = await completer.future.timeout(_terminalCommandTimeout);
+      return _extractMarkedTerminalOutput(rawOutput);
+    } finally {
+      await subscription?.cancel();
+      await connection.close();
+    }
+  }
+
   Future<void> executeNodePowerAction(
     String node,
     NodePowerAction action,
@@ -552,6 +694,67 @@ class ProxmoxClient {
       '/nodes/$node/status',
       body: {'command': action.command},
     );
+  }
+
+  String _nodeTemperatureCommand() {
+    return "LC_ALL=C; "
+        "setopt nonomatch 2>/dev/null || true; "
+        "printf '\\n%s\\n' '__PVE''_MANAGER''_TEMP''_START__'; "
+        "if command -v sensors >/dev/null 2>&1; then "
+        "sensors 2>/dev/null || true; "
+        "else "
+        "for h in /sys/class/hwmon/hwmon*; do "
+        "[ -d \"\$h\" ] || continue; "
+        "chip=\$(cat \"\$h/name\" 2>/dev/null || basename \"\$h\"); "
+        "for f in \"\$h\"/temp*_input; do "
+        "[ -r \"\$f\" ] || continue; "
+        "base=\${f%_input}; "
+        "label=\$(cat \"\${base}_label\" 2>/dev/null || basename \"\$base\"); "
+        "value=\$(cat \"\$f\" 2>/dev/null); "
+        "printf 'hwmon %s %s: %s\\n' \"\$chip\" \"\$label\" \"\$value\"; "
+        "done; "
+        "done; "
+        "for z in /sys/class/thermal/thermal_zone*; do "
+        "[ -r \"\$z/temp\" ] || continue; "
+        "t=\$(cat \"\$z/type\" 2>/dev/null || basename \"\$z\"); "
+        "v=\$(cat \"\$z/temp\" 2>/dev/null); "
+        "printf 'sysfs %s: %s\\n' \"\$t\" \"\$v\"; "
+        "done; "
+        "fi; "
+        "if command -v smartctl >/dev/null 2>&1; then "
+        "scan=\$(smartctl --scan-open 2>/dev/null || smartctl --scan 2>/dev/null || true); "
+        "if [ -n \"\$scan\" ]; then "
+        "printf '%s\\n' \"\$scan\" | while read -r d opt dtype rest; do "
+        "[ -n \"\$d\" ] || continue; "
+        "case \"\$d\" in \\#*) continue;; esac; "
+        "if [ \"\$opt\" = \"-d\" ] && [ -n \"\$dtype\" ] && [ \"\$dtype\" != \"#\" ]; then "
+        "printf 'smartctl %s -d %s\\n' \"\$d\" \"\$dtype\"; "
+        "{ smartctl -i -d \"\$dtype\" \"\$d\" 2>/dev/null; "
+        "smartctl -A -d \"\$dtype\" \"\$d\" 2>/dev/null; "
+        "smartctl -l scttempsts -d \"\$dtype\" \"\$d\" 2>/dev/null; } | "
+        "sed -n '/^Device Model:/p;/^Model Number:/p;/^Product:/p;/^Model:/p;/[Tt]emp/p;/194 /p;/190 /p'; "
+        "else "
+        "printf 'smartctl %s\\n' \"\$d\"; "
+        "{ smartctl -i \"\$d\" 2>/dev/null; "
+        "smartctl -A \"\$d\" 2>/dev/null; "
+        "smartctl -l scttempsts \"\$d\" 2>/dev/null; } | "
+        "sed -n '/^Device Model:/p;/^Model Number:/p;/^Product:/p;/^Model:/p;/[Tt]emp/p;/194 /p;/190 /p'; "
+        "fi; "
+        "done; "
+        "else "
+        "for d in /dev/nvme[0-9] /dev/nvme*n1 /dev/sd? /dev/hd? /dev/disk/by-id/ata-*; do "
+        "[ -e \"\$d\" ] || continue; "
+        "case \"\$d\" in *-part*) continue;; esac; "
+        "printf 'smartctl %s\\n' \"\$d\"; "
+        "{ smartctl -i \"\$d\" 2>/dev/null || smartctl -i -d sat \"\$d\" 2>/dev/null; "
+        "smartctl -A \"\$d\" 2>/dev/null || smartctl -A -d sat \"\$d\" 2>/dev/null; "
+        "smartctl -l scttempsts \"\$d\" 2>/dev/null || smartctl -l scttempsts -d sat \"\$d\" 2>/dev/null; } | "
+        "sed -n '/^Device Model:/p;/^Model Number:/p;/^Product:/p;/^Model:/p;/[Tt]emp/p;/194 /p;/190 /p'; "
+        "done; "
+        "fi; "
+        "fi; "
+        "printf '%s\\n' '__PVE''_MANAGER''_TEMP''_END__'; "
+        "exit";
   }
 
   Future<void> executeGuestAction(PveResource guest, GuestAction action) async {
@@ -769,6 +972,34 @@ class ProxmoxClient {
       ..badCertificateCallback =
           (X509Certificate cert, String host, int port) =>
               ignoreCertificateErrors;
+  }
+
+  static String _decodeTerminalMessage(dynamic message) {
+    if (message is String) {
+      return message;
+    }
+    if (message is List<int>) {
+      return utf8.decode(message, allowMalformed: true);
+    }
+    return '';
+  }
+
+  static bool _hasTerminalMarkerLine(String output, String marker) {
+    return output.contains(marker);
+  }
+
+  static String _extractMarkedTerminalOutput(String output) {
+    final start = output.indexOf(_temperatureStartMarker);
+    if (start == -1) {
+      return '';
+    }
+
+    final contentStart = start + _temperatureStartMarker.length;
+    final end = output.indexOf(_temperatureEndMarker, contentStart);
+    if (end == -1) {
+      return output.substring(contentStart);
+    }
+    return output.substring(contentStart, end);
   }
 
   static int _typeRank(String type) {

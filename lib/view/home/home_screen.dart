@@ -296,6 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
         client.close();
         return;
       }
+      unawaited(client.preloadClusterNodeThermalStates());
       if (!mounted) {
         client.close();
         return;
