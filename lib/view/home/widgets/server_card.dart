@@ -83,20 +83,22 @@ class ServerCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Padding(
-                    padding: EdgeInsets.only(right: isConnecting ? 34 : 0),
-                    child: Wrap(
-                      spacing: 24,
-                      runSpacing: 2,
+                    padding: EdgeInsets.only(right: isConnecting ? 36 : 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           '${server.username}@${server.realm}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                          softWrap: false,
                           style: textTheme.titleSmall?.copyWith(
                             color: cardTextColor,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           l10n.lastLogin(
                             timestampFromMilliseconds(
@@ -106,6 +108,7 @@ class ServerCard extends StatelessWidget {
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                          softWrap: false,
                           style: textTheme.titleSmall?.copyWith(
                             color: cardTextColor,
                             fontWeight: FontWeight.w800,
