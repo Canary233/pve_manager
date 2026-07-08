@@ -86,7 +86,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<PveSnapshot> _loadSnapshot() async {
     final resourcesResult = await _loadResources();
-    final resources = resourcesResult.resources;
+    final resources = resourcesResult.resources
+        .map(widget.client.applyCachedGuestDiskUsage)
+        .toList();
+    unawaited(widget.client.preloadGuestDiskUsage(resources));
     final nodesResult = await _loadNodes();
     final baseNodes = nodesResult.nodes;
     widget.client.preloadNodeThermalStates(baseNodes.map((node) => node.name));

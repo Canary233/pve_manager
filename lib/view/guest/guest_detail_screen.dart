@@ -43,7 +43,9 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
   late Future<List<GuestRrdPoint>> _historyFuture;
   Timer? _refreshTimer;
   bool _isRefreshing = false;
+  bool _isGuestStatusRefreshing = false;
   bool _isActionRunning = false;
+  int _guestStatusGeneration = 0;
   List<GuestRrdPoint>? _lastHistory;
   String _timeframe = 'hour';
 
@@ -52,8 +54,9 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _guest = widget.guest;
+    _guest = widget.client.applyCachedGuestDiskUsage(widget.guest);
     _historyFuture = _loadHistory();
+    unawaited(_refreshGuestStatus(notifyStart: false));
     widget.autoRefreshIntervalListenable.addListener(_startRefreshTimer);
     _startRefreshTimer();
   }
@@ -61,6 +64,14 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
   @override
   void didUpdateWidget(GuestDetailScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.guest.id != widget.guest.id) {
+      _guestStatusGeneration++;
+      _isGuestStatusRefreshing = false;
+      _guest = widget.client.applyCachedGuestDiskUsage(widget.guest);
+      _lastHistory = null;
+      _historyFuture = _loadHistory();
+      unawaited(_refreshGuestStatus(notifyStart: false));
+    }
     if (oldWidget.autoRefreshIntervalListenable !=
         widget.autoRefreshIntervalListenable) {
       oldWidget.autoRefreshIntervalListenable.removeListener(
@@ -109,16 +120,7 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
       _historyFuture = historyFuture;
     });
 
-    try {
-      final guest = await widget.client.getGuestCurrentStatus(_guest);
-      if (mounted) {
-        setState(() {
-          _guest = guest;
-        });
-      }
-    } on Object {
-      // Keep the last visible resource usage if a refresh fails.
-    }
+    await _refreshGuestStatus();
 
     try {
       await historyFuture;
@@ -126,6 +128,35 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
       // FutureBuilder renders the error when there is no cached history.
     } finally {
       _isRefreshing = false;
+    }
+  }
+
+  Future<void> _refreshGuestStatus({bool notifyStart = true}) async {
+    if (_isGuestStatusRefreshing) {
+      return;
+    }
+
+    final generation = ++_guestStatusGeneration;
+    _isGuestStatusRefreshing = true;
+    if (notifyStart && mounted) {
+      setState(() {});
+    }
+
+    try {
+      final guest = await widget.client.getGuestCurrentStatus(_guest);
+      if (mounted && generation == _guestStatusGeneration) {
+        setState(() {
+          _guest = guest;
+        });
+      }
+    } on Object {
+      // Keep the last visible resource usage if a refresh fails.
+    } finally {
+      if (mounted && generation == _guestStatusGeneration) {
+        setState(() {
+          _isGuestStatusRefreshing = false;
+        });
+      }
     }
   }
 
@@ -264,6 +295,10 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
   Widget build(BuildContext context) {
     final guest = _guest;
     final l10n = context.l10n;
+    final isDiskUsageLoading = _isDiskUsageLoading(
+      guest,
+      isGuestStatusRefreshing: _isGuestStatusRefreshing,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -351,8 +386,10 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
                   UsageLine(
                     label: l10n.disk,
                     value: guest.diskRatio,
-                    text:
-                        '${bytes(guest.diskUsed)} / ${bytes(guest.diskTotal)}',
+                    text: isDiskUsageLoading
+                        ? ''
+                        : '${bytes(guest.diskUsed)} / ${bytes(guest.diskTotal)}',
+                    isLoading: isDiskUsageLoading,
                   ),
                 ],
               ),
@@ -432,6 +469,16 @@ class _GuestDetailScreenState extends State<GuestDetailScreen> {
       ),
     );
   }
+}
+
+bool _isDiskUsageLoading(
+  PveResource guest, {
+  required bool isGuestStatusRefreshing,
+}) {
+  return guest.type == 'qemu' &&
+      guest.status == 'running' &&
+      guest.diskUsed <= 0 &&
+      isGuestStatusRefreshing;
 }
 
 class _GuestTimeframeSelector extends StatelessWidget {

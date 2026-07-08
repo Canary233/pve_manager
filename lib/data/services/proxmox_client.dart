@@ -44,6 +44,10 @@ class ProxmoxClient {
       <String, NodeThermalState>{};
   final Map<String, Future<NodeThermalState>> _nodeThermalStateRequests =
       <String, Future<NodeThermalState>>{};
+  final Map<String, _GuestDiskUsage> _guestDiskUsageCache =
+      <String, _GuestDiskUsage>{};
+  final Map<String, Future<_GuestDiskUsage?>> _guestDiskUsageRequests =
+      <String, Future<_GuestDiskUsage?>>{};
 
   static const Duration _requestTimeout = Duration(seconds: 12);
   static const Duration _terminalCommandTimeout = Duration(seconds: 20);
@@ -286,13 +290,57 @@ class ProxmoxClient {
     }
   }
 
-  Future<void> preloadClusterNodeThermalStates() async {
+  void preloadClusterNodeThermalStates() {
+    unawaited(() async {
+      try {
+        final nodes = await getNodes();
+        preloadNodeThermalStates(nodes.map((node) => node.name));
+      } on Object {
+        // SMART details are optional; connection should not wait on preloading.
+      }
+    }());
+  }
+
+  Future<void> preloadClusterGuestDiskUsage() async {
     try {
-      final nodes = await getNodes();
-      preloadNodeThermalStates(nodes.map((node) => node.name));
+      final resources = await getResources(type: 'vm');
+      await preloadGuestDiskUsage(resources);
     } on Object {
-      // SMART details are optional; connection should not wait on preloading.
+      // Guest agent disk details are optional and should not block connection.
     }
+  }
+
+  Future<void> preloadGuestDiskUsage(Iterable<PveResource> guests) async {
+    final futures = <Future<_GuestDiskUsage?>>[];
+
+    for (final guest in guests) {
+      if (!_shouldLoadGuestDiskUsage(guest)) {
+        continue;
+      }
+
+      final key = _guestDiskUsageCacheKey(guest);
+      if (key == null ||
+          _guestDiskUsageCache.containsKey(key) ||
+          _guestDiskUsageRequests.containsKey(key)) {
+        continue;
+      }
+
+      futures.add(_getQemuGuestAgentDiskUsage(guest));
+    }
+
+    if (futures.isEmpty) {
+      return;
+    }
+
+    await Future.wait(futures);
+  }
+
+  PveResource applyCachedGuestDiskUsage(PveResource guest) {
+    final usage = _cachedGuestDiskUsage(guest);
+    if (usage == null) {
+      return guest;
+    }
+    return guest.copyWith(diskUsed: usage.used, diskTotal: usage.total);
   }
 
   Future<NodeThermalState> _fetchNodeThermalState(String node) async {
@@ -389,7 +437,72 @@ class ProxmoxClient {
       return guest;
     }
 
-    return guest.mergeStatus(data);
+    final currentStatus = guest.mergeStatus(data);
+    if (!_shouldLoadGuestDiskUsage(currentStatus)) {
+      return currentStatus;
+    }
+
+    final agentDiskUsage = await _getQemuGuestAgentDiskUsage(
+      currentStatus,
+      useCached: false,
+    );
+    if (agentDiskUsage == null) {
+      return currentStatus;
+    }
+
+    return currentStatus.copyWith(
+      diskUsed: agentDiskUsage.used,
+      diskTotal: agentDiskUsage.total,
+    );
+  }
+
+  Future<_GuestDiskUsage?> _getQemuGuestAgentDiskUsage(
+    PveResource guest, {
+    bool useCached = true,
+  }) async {
+    final key = _guestDiskUsageCacheKey(guest);
+    if (key == null) {
+      return null;
+    }
+
+    if (useCached) {
+      final cached = _guestDiskUsageCache[key];
+      if (cached != null) {
+        return cached;
+      }
+    }
+
+    final pending = _guestDiskUsageRequests[key];
+    if (pending != null) {
+      return pending;
+    }
+
+    final request = _fetchQemuGuestAgentDiskUsage(guest, key);
+    _guestDiskUsageRequests[key] = request;
+    return request;
+  }
+
+  Future<_GuestDiskUsage?> _fetchQemuGuestAgentDiskUsage(
+    PveResource guest,
+    String key,
+  ) async {
+    try {
+      final response = await _request(
+        'GET',
+        '/nodes/${guest.node}/qemu/${guest.vmid}/agent/get-fsinfo',
+      );
+      final usage = _parseGuestAgentDiskUsage(response['data']);
+      if (usage != null) {
+        _guestDiskUsageCache[key] = usage;
+      }
+      return usage;
+    } on ProxmoxApiException {
+      return _guestDiskUsageCache[key];
+    } on Object {
+      return _guestDiskUsageCache[key];
+    } finally {
+      _guestDiskUsageRequests.remove(key);
+    }
   }
 
   Future<GuestConfig> getGuestConfig(PveResource guest) async {
@@ -1012,6 +1125,123 @@ class ProxmoxClient {
     };
   }
 
+  _GuestDiskUsage? _cachedGuestDiskUsage(PveResource guest) {
+    final key = _guestDiskUsageCacheKey(guest);
+    if (key == null) {
+      return null;
+    }
+    return _guestDiskUsageCache[key];
+  }
+
+  static bool _shouldLoadGuestDiskUsage(PveResource guest) {
+    return guest.type == 'qemu' &&
+        guest.vmid != null &&
+        guest.status == 'running';
+  }
+
+  static String? _guestDiskUsageCacheKey(PveResource guest) {
+    final vmid = guest.vmid;
+    if (guest.type != 'qemu' || vmid == null) {
+      return null;
+    }
+    return '${guest.node}/$vmid';
+  }
+
+  static _GuestDiskUsage? _parseGuestAgentDiskUsage(Object? value) {
+    final entries = _guestAgentFileSystems(value);
+    if (entries.isEmpty) {
+      return null;
+    }
+
+    var used = 0;
+    var total = 0;
+    final seenMounts = <String>{};
+
+    for (final entry in entries) {
+      if (!_isRealGuestFileSystem(entry)) {
+        continue;
+      }
+
+      final entryTotal = _intValue(
+        entry['total-bytes'] ?? entry['total_bytes'] ?? entry['total'],
+      );
+      final entryUsed = _intValue(
+        entry['used-bytes'] ?? entry['used_bytes'] ?? entry['used'],
+      );
+      if (entryTotal <= 0 || entryUsed < 0) {
+        continue;
+      }
+
+      final mountKey = _guestFileSystemMountKey(entry);
+      if (mountKey != null && !seenMounts.add(mountKey)) {
+        continue;
+      }
+
+      used += entryUsed > entryTotal ? entryTotal : entryUsed;
+      total += entryTotal;
+    }
+
+    if (total <= 0) {
+      return null;
+    }
+    return _GuestDiskUsage(used: used, total: total);
+  }
+
+  static List<Map<String, dynamic>> _guestAgentFileSystems(Object? value) {
+    final rawEntries = switch (value) {
+      {'result': final Object? result} => result,
+      {'data': final Object? data} => data,
+      _ => value,
+    };
+    if (rawEntries is! Iterable) {
+      return const <Map<String, dynamic>>[];
+    }
+    return rawEntries.whereType<Map<String, dynamic>>().toList();
+  }
+
+  static bool _isRealGuestFileSystem(Map<String, dynamic> entry) {
+    final type = entry['type']?.toString().trim().toLowerCase();
+    const pseudoTypes = <String>{
+      'autofs',
+      'bpf',
+      'cgroup',
+      'cgroup2',
+      'configfs',
+      'debugfs',
+      'devpts',
+      'devtmpfs',
+      'efivarfs',
+      'fusectl',
+      'hugetlbfs',
+      'mqueue',
+      'nsfs',
+      'proc',
+      'pstore',
+      'ramfs',
+      'securityfs',
+      'squashfs',
+      'sysfs',
+      'tmpfs',
+      'tracefs',
+    };
+    if (type == null || type.isEmpty) {
+      return true;
+    }
+    return !pseudoTypes.contains(type);
+  }
+
+  static String? _guestFileSystemMountKey(Map<String, dynamic> entry) {
+    final mountpoint = entry['mountpoint']?.toString().trim();
+    if (mountpoint != null && mountpoint.isNotEmpty) {
+      return mountpoint.toLowerCase();
+    }
+    final name = entry['name']?.toString().trim();
+    if (name != null && name.isNotEmpty) {
+      return name.toLowerCase();
+    }
+    return null;
+  }
+
   static bool _isParameterVerificationFailure(ProxmoxApiException error) {
     if (error.code != ProxmoxErrorCode.requestFailed) {
       return false;
@@ -1050,6 +1280,13 @@ class _ApiResponse {
 
   final Map<String, dynamic> body;
   final bool usedFallback;
+}
+
+class _GuestDiskUsage {
+  const _GuestDiskUsage({required this.used, required this.total});
+
+  final int used;
+  final int total;
 }
 
 class ProxmoxTerminalConnection {

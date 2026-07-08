@@ -5,12 +5,14 @@ class UsageLine extends StatelessWidget {
     required this.label,
     required this.value,
     required this.text,
+    this.isLoading = false,
     super.key,
   });
 
   final String label;
   final double value;
   final String text;
+  final bool isLoading;
 
   static const double _edgeTextWidth = 128;
   static const double _rightAlignedBreakpoint = 520;
@@ -35,20 +37,51 @@ class UsageLine extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    text,
-                    textAlign: alignRight ? TextAlign.right : TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  child: isLoading
+                      ? _InlineUsageLoadingIndicator(alignRight: alignRight)
+                      : Text(
+                          text,
+                          textAlign: alignRight
+                              ? TextAlign.right
+                              : TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                 ),
                 if (!alignRight) const SizedBox(width: _edgeTextWidth),
               ],
             ),
             const SizedBox(height: 5),
-            LinearProgressIndicator(value: value.clamp(0, 1)),
+            LinearProgressIndicator(
+              value: isLoading ? null : value.clamp(0, 1),
+            ),
           ],
         );
       },
+    );
+  }
+}
+
+class _InlineUsageLoadingIndicator extends StatelessWidget {
+  const _InlineUsageLoadingIndicator({required this.alignRight});
+
+  final bool alignRight;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: alignRight ? Alignment.centerRight : Alignment.center,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 72),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            minHeight: 3,
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
+          ),
+        ),
+      ),
     );
   }
 }
