@@ -1,0 +1,145 @@
+name: Build Flutter
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  checks:
+    name: Analyze and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+  build-android:
+    name: Build Android APK (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    needs: checks
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: armv7
+            target_platform: android-arm
+            apk_abi: armeabi-v7a
+          - name: armv8
+            target_platform: android-arm64
+            apk_abi: arm64-v8a
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Configure Android signing
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "Android signing secrets are not configured." >&2
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
+
+      - name: Build debug APK (${{ matrix.name }})
+        if: ${{ github.event_name == 'pull_request' }}
+        run: flutter build apk --debug --target-platform ${{ matrix.target_platform }} --split-per-abi
+
+      - name: Build signed release APK (${{ matrix.name }})
+        if: ${{ github.event_name != 'pull_request' }}
+        run: flutter build apk --release --target-platform ${{ matrix.target_platform }} --split-per-abi
+
+      - name: Upload debug APK (${{ matrix.name }})
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pve-manager-android-${{ matrix.name }}-debug-apk
+          path: build/app/outputs/flutter-apk/app-${{ matrix.apk_abi }}-debug.apk
+          if-no-files-found: error
+
+      - name: Upload signed release APK (${{ matrix.name }})
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pve-manager-android-${{ matrix.name }}-signed-release-apk
+          path: build/app/outputs/flutter-apk/app-${{ matrix.apk_abi }}-release.apk
+          if-no-files-found: error
+
+  build-windows:
+    name: Build Windows App
+    runs-on: windows-latest
+    needs: checks
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pve-manager-windows-release
+          path: build/windows/x64/runner/Release/
+          if-no-files-found: error
