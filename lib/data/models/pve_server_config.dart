@@ -1,3 +1,4 @@
+import 'package:pve_manager/data/models/proxmox_auth_mode.dart';
 import 'package:pve_manager/data/services/proxmox_client.dart';
 
 class PveServerConfig {
@@ -9,6 +10,9 @@ class PveServerConfig {
     required this.password,
     required this.realm,
     required this.ignoreCertificateErrors,
+    this.authMode = ProxmoxAuthMode.password,
+    this.apiTokenId = '',
+    this.apiTokenSecret = '',
     this.lastConnectedAt,
   });
 
@@ -19,9 +23,23 @@ class PveServerConfig {
   final String password;
   final String realm;
   final bool ignoreCertificateErrors;
+  final ProxmoxAuthMode authMode;
+  final String apiTokenId;
+  final String apiTokenSecret;
   final int? lastConnectedAt;
 
   String get host => Uri.parse(origin).host;
+  String get userId => username.contains('@') ? username : '$username@$realm';
+  ProxmoxApiTokenCredentials get apiTokenCredentials =>
+      ProxmoxApiTokenCredentials.fromInput(
+        username: username,
+        realm: realm,
+        tokenId: apiTokenId,
+        tokenSecret: apiTokenSecret,
+      );
+  String get accountLabel => authMode == ProxmoxAuthMode.apiToken
+      ? apiTokenCredentials.accountLabel
+      : userId;
 
   PveServerConfig copyWith({
     int? id,
@@ -31,6 +49,9 @@ class PveServerConfig {
     String? password,
     String? realm,
     bool? ignoreCertificateErrors,
+    ProxmoxAuthMode? authMode,
+    String? apiTokenId,
+    String? apiTokenSecret,
     int? lastConnectedAt,
   }) {
     return PveServerConfig(
@@ -42,6 +63,9 @@ class PveServerConfig {
       realm: realm ?? this.realm,
       ignoreCertificateErrors:
           ignoreCertificateErrors ?? this.ignoreCertificateErrors,
+      authMode: authMode ?? this.authMode,
+      apiTokenId: apiTokenId ?? this.apiTokenId,
+      apiTokenSecret: apiTokenSecret ?? this.apiTokenSecret,
       lastConnectedAt: lastConnectedAt ?? this.lastConnectedAt,
     );
   }
@@ -56,6 +80,9 @@ class PveServerConfig {
       realm: map['realm']?.toString() ?? 'pam',
       ignoreCertificateErrors:
           (map['ignore_certificate_errors'] as int? ?? 1) == 1,
+      authMode: ProxmoxAuthMode.fromStorage(map['auth_type']),
+      apiTokenId: map['api_token_id']?.toString() ?? '',
+      apiTokenSecret: map['api_token_secret']?.toString() ?? '',
       lastConnectedAt: map['last_connected_at'] as int?,
     );
   }
@@ -69,16 +96,31 @@ class PveServerConfig {
       'password': password,
       'realm': realm,
       'ignore_certificate_errors': ignoreCertificateErrors ? 1 : 0,
+      'auth_type': authMode.storageValue,
+      'api_token_id': apiTokenId,
+      'api_token_secret': apiTokenSecret,
       'last_connected_at': lastConnectedAt,
     };
   }
 
   ProxmoxClient createClient() {
+    final tokenCredentials = apiTokenCredentials;
     return ProxmoxClient(
       origin: origin,
-      username: username,
+      username: authMode == ProxmoxAuthMode.apiToken
+          ? tokenCredentials.username
+          : username,
       password: password,
-      realm: realm,
+      realm: authMode == ProxmoxAuthMode.apiToken
+          ? tokenCredentials.realm
+          : realm,
+      authMode: authMode,
+      apiTokenId: authMode == ProxmoxAuthMode.apiToken
+          ? tokenCredentials.tokenId
+          : apiTokenId,
+      apiTokenSecret: authMode == ProxmoxAuthMode.apiToken
+          ? tokenCredentials.secret
+          : apiTokenSecret,
       ignoreCertificateErrors: ignoreCertificateErrors,
     );
   }

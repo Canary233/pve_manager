@@ -70,7 +70,7 @@ class ServerRepository {
     final path = p.join(databasePath, 'pve_manager.db');
     _database = await sqflite.openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE servers (
@@ -81,6 +81,9 @@ class ServerRepository {
             password TEXT NOT NULL,
             realm TEXT NOT NULL,
             ignore_certificate_errors INTEGER NOT NULL DEFAULT 1,
+            auth_type TEXT NOT NULL DEFAULT 'password',
+            api_token_id TEXT NOT NULL DEFAULT '',
+            api_token_secret TEXT NOT NULL DEFAULT '',
             last_connected_at INTEGER,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
@@ -91,6 +94,17 @@ class ServerRepository {
         if (oldVersion < 2) {
           await db.execute(
             'ALTER TABLE servers ADD COLUMN last_connected_at INTEGER',
+          );
+        }
+        if (oldVersion < 3) {
+          await db.execute(
+            "ALTER TABLE servers ADD COLUMN auth_type TEXT NOT NULL DEFAULT 'password'",
+          );
+          await db.execute(
+            "ALTER TABLE servers ADD COLUMN api_token_id TEXT NOT NULL DEFAULT ''",
+          );
+          await db.execute(
+            "ALTER TABLE servers ADD COLUMN api_token_secret TEXT NOT NULL DEFAULT ''",
           );
         }
       },

@@ -43,7 +43,11 @@ dependencies:
   sqflite_common_ffi: ^2.3.6
   shared_preferences: ^2.5.5
   webview_windows: ^0.4.0
-  xterm: ^4.0.0
+  # Includes the scroll-region buffer fix from upstream PR #227.
+  xterm:
+    git:
+      url: https://github.com/leynier/xterm.dart.git
+      ref: 9bfa02d74b6c2137173bf4b32002841486ea65a8
 
 dev_dependencies:
   flutter_test:

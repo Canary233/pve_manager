@@ -55,6 +55,7 @@ class _LocalTerminalScreenState extends State<LocalTerminalScreen> {
   bool _disposed = false;
   bool _ctrlLatch = false;
   bool _altLatch = false;
+  int _toastRequestId = 0;
 
   @override
   void initState() {
@@ -287,9 +288,19 @@ class _LocalTerminalScreenState extends State<LocalTerminalScreen> {
     await _showNativeToast('已复制');
   }
 
-  Future<void> _showNativeToast(String message) async {
+  Future<void> _showNativeToast(
+    String message, {
+    Duration delay = Duration.zero,
+  }) async {
     if (defaultTargetPlatform != TargetPlatform.android) {
       return;
+    }
+    final requestId = ++_toastRequestId;
+    if (delay > Duration.zero) {
+      await Future<void>.delayed(delay);
+      if (!mounted || requestId != _toastRequestId) {
+        return;
+      }
     }
     const channel = MethodChannel('pve_manager/toast');
     await channel.invokeMethod<void>('show', <String, String>{
@@ -313,7 +324,9 @@ class _LocalTerminalScreenState extends State<LocalTerminalScreen> {
     if (!mounted) {
       return;
     }
-    await _showNativeToast('已粘贴');
+    // Android 13+ shows its own clipboard access overlay first. Delay the
+    // requested native toast so it is not hidden behind that system overlay.
+    await _showNativeToast('已粘贴', delay: const Duration(seconds: 6));
   }
 
   void _sendShortcut(_TerminalShortcut shortcut) {

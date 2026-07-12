@@ -26,6 +26,7 @@ class NodeTasksLogsScreen extends StatefulWidget {
 class _NodeTasksLogsScreenState extends State<NodeTasksLogsScreen>
     with SingleTickerProviderStateMixin {
   static const Duration _loadTimeout = Duration(seconds: 8);
+  static const Duration _logLoadTimeout = Duration(seconds: 25);
   static const int _taskPageSize = 20;
   static const int _logPageSize = 30;
 
@@ -153,7 +154,7 @@ class _NodeTasksLogsScreenState extends State<NodeTasksLogsScreen>
       _logsClient = client;
       final result = await client
           .getNodeSyslog(widget.node.name, start: start, limit: _logPageSize)
-          .timeout(_loadTimeout);
+          .timeout(_logLoadTimeout);
       if (!mounted || loadId != _logsLoadId) {
         return;
       }

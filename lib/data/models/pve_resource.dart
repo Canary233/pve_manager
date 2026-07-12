@@ -19,13 +19,21 @@ class PveResource {
     final type = json['type']?.toString() ?? 'unknown';
     final vmid = asNullableInt(json['vmid']);
     final fallbackName = vmid == null ? type : '$type $vmid';
+    final id = json['id']?.toString() ?? fallbackName;
+    final configuredName = json['name']?.toString().trim();
+    final storageName = json['storage']?.toString().trim();
+    final name = configuredName?.isNotEmpty == true
+        ? configuredName!
+        : type == 'storage' && storageName?.isNotEmpty == true
+        ? storageName!
+        : type == 'storage' && id.contains('/')
+        ? id.split('/').last
+        : fallbackName;
 
     return PveResource(
-      id: json['id']?.toString() ?? fallbackName,
+      id: id,
       type: type,
-      name: json['name']?.toString().trim().isNotEmpty == true
-          ? json['name'].toString()
-          : fallbackName,
+      name: name,
       node: json['node']?.toString() ?? '-',
       status: json['status']?.toString() ?? 'unknown',
       cpu: asDouble(json['cpu']),

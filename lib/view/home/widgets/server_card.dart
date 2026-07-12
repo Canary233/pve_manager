@@ -89,7 +89,7 @@ class ServerCard extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '${server.username}@${server.realm}',
+                          server.accountLabel,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           softWrap: false,

@@ -216,8 +216,8 @@ class NodeTemperatureSensor {
     final normalized = searchableText;
     if (normalized.contains('package') ||
         normalized.contains('cpu') ||
-        normalized.contains('tctl') ||
-        normalized.contains('tdie')) {
+        _containsSensorName(normalized, 'tctl') ||
+        _containsSensorName(normalized, 'tdie')) {
       return 0;
     }
     if (normalized.contains('core')) {
@@ -249,8 +249,8 @@ class NodeTemperatureSensor {
         text.contains('zenpower') ||
         text.contains('package') ||
         text.contains('pkg temp') ||
-        text.contains('tctl') ||
-        text.contains('tdie') ||
+        _containsSensorName(text, 'tctl') ||
+        _containsSensorName(text, 'tdie') ||
         RegExp(r'\bcpu\b').hasMatch(text) ||
         RegExp(r'\bcore\s*\d+\b').hasMatch(text);
   }
@@ -356,8 +356,12 @@ bool _isCpuPackageTemperatureSensor(NodeTemperatureSensor sensor) {
   final text = sensor.searchableText;
   return text.contains('package') ||
       text.contains('pkg temp') ||
-      text.contains('tctl') ||
-      text.contains('tdie');
+      _containsSensorName(text, 'tctl') ||
+      _containsSensorName(text, 'tdie');
+}
+
+bool _containsSensorName(String text, String name) {
+  return RegExp('(?:^|[^a-z0-9])$name(?:[^a-z0-9]|\$)').hasMatch(text);
 }
 
 bool _isCpuPrimaryTemperatureSensor(NodeTemperatureSensor sensor) {

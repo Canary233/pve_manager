@@ -662,6 +662,36 @@ abstract class AppLocalizations {
   /// **'Realm'**
   String get realm;
 
+  /// No description provided for @authMethod.
+  ///
+  /// In zh, this message translates to:
+  /// **'认证方式'**
+  String get authMethod;
+
+  /// No description provided for @passwordLogin.
+  ///
+  /// In zh, this message translates to:
+  /// **'密码'**
+  String get passwordLogin;
+
+  /// No description provided for @apiTokenLogin.
+  ///
+  /// In zh, this message translates to:
+  /// **'API 令牌'**
+  String get apiTokenLogin;
+
+  /// No description provided for @apiTokenId.
+  ///
+  /// In zh, this message translates to:
+  /// **'令牌 ID'**
+  String get apiTokenId;
+
+  /// No description provided for @apiTokenSecret.
+  ///
+  /// In zh, this message translates to:
+  /// **'令牌密钥'**
+  String get apiTokenSecret;
+
   /// No description provided for @allowSelfSignedCertificate.
   ///
   /// In zh, this message translates to:
@@ -727,6 +757,24 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'请输入密码'**
   String get enterPassword;
+
+  /// No description provided for @enterApiTokenId.
+  ///
+  /// In zh, this message translates to:
+  /// **'请输入令牌 ID'**
+  String get enterApiTokenId;
+
+  /// No description provided for @enterApiTokenSecret.
+  ///
+  /// In zh, this message translates to:
+  /// **'请输入令牌密钥'**
+  String get enterApiTokenSecret;
+
+  /// No description provided for @apiTokenWebConsoleUnsupported.
+  ///
+  /// In zh, this message translates to:
+  /// **'API 令牌不能用于网页 VNC 控制台，请改用密码登录。'**
+  String get apiTokenWebConsoleUnsupported;
 
   /// No description provided for @neverConnected.
   ///

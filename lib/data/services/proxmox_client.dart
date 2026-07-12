@@ -12,6 +12,7 @@ import 'package:pve_manager/data/models/node_status.dart';
 import 'package:pve_manager/data/models/node_task.dart';
 import 'package:pve_manager/data/models/node_terminal_session.dart';
 import 'package:pve_manager/data/models/paged_result.dart';
+import 'package:pve_manager/data/models/proxmox_auth_mode.dart';
 import 'package:pve_manager/data/models/pve_node.dart';
 import 'package:pve_manager/data/models/pve_resource.dart';
 
@@ -24,6 +25,9 @@ class ProxmoxClient {
     required this.username,
     required this.password,
     this.realm = 'pam',
+    this.authMode = ProxmoxAuthMode.password,
+    this.apiTokenId = '',
+    this.apiTokenSecret = '',
     this.ignoreCertificateErrors = false,
   }) : _httpClient = HttpClient() {
     _httpClient.connectionTimeout = const Duration(seconds: 15);
@@ -36,10 +40,14 @@ class ProxmoxClient {
   final String username;
   final String password;
   final String realm;
+  final ProxmoxAuthMode authMode;
+  final String apiTokenId;
+  final String apiTokenSecret;
   final bool ignoreCertificateErrors;
   final HttpClient _httpClient;
   String? _ticket;
   String? _csrfToken;
+  bool _apiTokenAuthenticated = false;
   final Map<String, NodeThermalState> _nodeThermalStateCache =
       <String, NodeThermalState>{};
   final Map<String, Future<NodeThermalState>> _nodeThermalStateRequests =
@@ -50,16 +58,27 @@ class ProxmoxClient {
       <String, Future<_GuestDiskUsage?>>{};
 
   static const Duration _requestTimeout = Duration(seconds: 12);
-  static const Duration _terminalCommandTimeout = Duration(seconds: 20);
-  static const String _temperatureStartMarker = '__PVE_MANAGER_TEMP_START__';
-  static const String _temperatureEndMarker = '__PVE_MANAGER_TEMP_END__';
 
   String get displayHost => Uri.parse(origin).host;
-  bool get hasActiveSession => _ticket != null;
+  bool get usesApiToken => authMode == ProxmoxAuthMode.apiToken;
+  bool get hasActiveSession =>
+      usesApiToken ? _apiTokenAuthenticated : _ticket != null;
   String get host => Uri.parse(origin).host;
+  String get _configuredUserId =>
+      username.contains('@') ? username : '$username@$realm';
+  ProxmoxApiTokenCredentials get _apiTokenCredentials =>
+      ProxmoxApiTokenCredentials.fromInput(
+        username: username,
+        realm: realm,
+        tokenId: apiTokenId,
+        tokenSecret: apiTokenSecret,
+      );
+  String get userId =>
+      usesApiToken ? _apiTokenCredentials.userId : _configuredUserId;
+  bool get supportsWebConsoleAuthentication => !usesApiToken;
 
   ProxmoxClient forkSession() {
-    if (_ticket == null) {
+    if (!hasActiveSession) {
       throw const ProxmoxApiException(ProxmoxErrorCode.sessionExpired);
     }
 
@@ -68,10 +87,14 @@ class ProxmoxClient {
         username: username,
         password: password,
         realm: realm,
+        authMode: authMode,
+        apiTokenId: apiTokenId,
+        apiTokenSecret: apiTokenSecret,
         ignoreCertificateErrors: ignoreCertificateErrors,
       )
       .._ticket = _ticket
-      .._csrfToken = _csrfToken;
+      .._csrfToken = _csrfToken
+      .._apiTokenAuthenticated = _apiTokenAuthenticated;
   }
 
   String get authCookieValue {
@@ -81,6 +104,21 @@ class ProxmoxClient {
     }
 
     return ticket;
+  }
+
+  String get _apiTokenAuthorizationValue {
+    return _apiTokenCredentials.authorizationValue;
+  }
+
+  Map<String, dynamic> get _authenticatedSocketHeaders {
+    if (usesApiToken) {
+      return <String, dynamic>{
+        HttpHeaders.authorizationHeader: _apiTokenAuthorizationValue,
+      };
+    }
+    return <String, dynamic>{
+      HttpHeaders.cookieHeader: 'PVEAuthCookie=$authCookieValue',
+    };
   }
 
   Uri nodeShellConsoleUri(String node) {
@@ -117,11 +155,17 @@ class ProxmoxClient {
   }
 
   Future<void> login({String? tfaChallenge, String? tfaResponse}) async {
+    if (usesApiToken) {
+      await _request('GET', '/access/permissions');
+      _apiTokenAuthenticated = true;
+      return;
+    }
+
     final response = await _request(
       'POST',
       '/access/ticket',
       body: {
-        'username': username.contains('@') ? username : '$username@$realm',
+        'username': userId,
         'password': _ticketPassword(tfaResponse),
         if (tfaChallenge?.trim().isNotEmpty ?? false)
           'tfa-challenge': tfaChallenge!.trim(),
@@ -345,11 +389,7 @@ class ProxmoxClient {
 
   Future<NodeThermalState> _fetchNodeThermalState(String node) async {
     try {
-      final output = await _runNodeShellCommand(
-        node,
-        _nodeTemperatureCommand(),
-      );
-      final thermalState = NodeThermalState.fromJson(output);
+      final thermalState = await _fetchNodeThermalStateFromApi(node);
       if (!thermalState.isEmpty) {
         _nodeThermalStateCache[node] = thermalState;
       }
@@ -357,6 +397,55 @@ class ProxmoxClient {
     } finally {
       _nodeThermalStateRequests.remove(node);
     }
+  }
+
+  Future<NodeThermalState> _fetchNodeThermalStateFromApi(String node) async {
+    final results = await Future.wait<Object>([
+      getNodeStatus(node),
+      _request('GET', '/nodes/$node/disks/list'),
+    ]);
+    final nodeThermalState = (results[0] as NodeStatus).thermalState;
+    final diskListResponse = results[1] as Map<String, dynamic>;
+    final diskList = diskListResponse['data'];
+    if (diskList is! List) {
+      return nodeThermalState;
+    }
+
+    final disks = diskList
+        .whereType<Map<String, dynamic>>()
+        .where((disk) => _diskDevicePath(disk).isNotEmpty)
+        .toList();
+    final smartResults = await Future.wait(
+      disks.map((disk) async {
+        final device = _diskDevicePath(disk);
+        try {
+          final response = await _request(
+            'GET',
+            '/nodes/$node/disks/smart',
+            queryParameters: {'disk': device},
+          );
+          return _PveDiskSmartResult(disk: disk, response: response);
+        } on Object {
+          return _PveDiskSmartResult(disk: disk);
+        }
+      }),
+    );
+
+    final diskOutput = StringBuffer();
+    for (final result in smartResults) {
+      _writePveDiskSmartOutput(diskOutput, result);
+    }
+    final diskThermalState = NodeThermalState.fromJson(diskOutput.toString());
+    return NodeThermalState(
+      sensors: <NodeTemperatureSensor>[
+        ...nodeThermalState.sensors,
+        ...diskThermalState.sensors,
+      ],
+      diskInfos: <NodeDiskInfo>[
+        ...nodeThermalState.diskInfos,
+        ...diskThermalState.diskInfos,
+      ],
+    );
   }
 
   Future<List<NodeRrdPoint>> getNodeRrdData(
@@ -719,9 +808,7 @@ class ProxmoxClient {
       final socket = await WebSocket.connect(
         _terminalWebSocketUri(apiPath, session).toString(),
         protocols: const <String>['binary'],
-        headers: <String, dynamic>{
-          HttpHeaders.cookieHeader: 'PVEAuthCookie=$authCookieValue',
-        },
+        headers: _authenticatedSocketHeaders,
         customClient: client,
       ).timeout(_requestTimeout);
 
@@ -729,72 +816,6 @@ class ProxmoxClient {
     } on Object {
       client.close(force: true);
       rethrow;
-    }
-  }
-
-  Future<String> _runNodeShellCommand(String node, String command) async {
-    final session = await createNodeTerminalSession(node);
-    final connection = await connectTerminalWebSocket(
-      apiPath: nodeTerminalApiPath(node),
-      session: session,
-    );
-    StreamSubscription<dynamic>? subscription;
-
-    try {
-      final completer = Completer<String>();
-      final output = StringBuffer();
-      var authenticated = false;
-
-      subscription = connection.socket.listen(
-        (message) {
-          final text = _decodeTerminalMessage(message);
-          if (text.isEmpty || completer.isCompleted) {
-            return;
-          }
-
-          if (!authenticated) {
-            final okIndex = text.indexOf('OK');
-            if (okIndex == -1) {
-              return;
-            }
-
-            authenticated = true;
-            final remaining = text.substring(okIndex + 2);
-            if (remaining.isNotEmpty) {
-              output.write(remaining);
-            }
-            connection.socket.add('1:160:40:');
-            final input = '$command\r';
-            connection.socket.add('0:${utf8.encode(input).length}:$input');
-            return;
-          }
-
-          output.write(text);
-          if (_hasTerminalMarkerLine(
-            output.toString(),
-            _temperatureEndMarker,
-          )) {
-            completer.complete(output.toString());
-          }
-        },
-        onDone: () {
-          if (!completer.isCompleted) {
-            completer.complete(output.toString());
-          }
-        },
-        onError: (Object error, StackTrace stackTrace) {
-          if (!completer.isCompleted) {
-            completer.completeError(error, stackTrace);
-          }
-        },
-      );
-
-      connection.socket.add('${session.user}:${session.ticket}\n');
-      final rawOutput = await completer.future.timeout(_terminalCommandTimeout);
-      return _extractMarkedTerminalOutput(rawOutput);
-    } finally {
-      await subscription?.cancel();
-      await connection.close();
     }
   }
 
@@ -807,67 +828,6 @@ class ProxmoxClient {
       '/nodes/$node/status',
       body: {'command': action.command},
     );
-  }
-
-  String _nodeTemperatureCommand() {
-    return "LC_ALL=C; "
-        "setopt nonomatch 2>/dev/null || true; "
-        "printf '\\n%s\\n' '__PVE''_MANAGER''_TEMP''_START__'; "
-        "if command -v sensors >/dev/null 2>&1; then "
-        "sensors 2>/dev/null || true; "
-        "else "
-        "for h in /sys/class/hwmon/hwmon*; do "
-        "[ -d \"\$h\" ] || continue; "
-        "chip=\$(cat \"\$h/name\" 2>/dev/null || basename \"\$h\"); "
-        "for f in \"\$h\"/temp*_input; do "
-        "[ -r \"\$f\" ] || continue; "
-        "base=\${f%_input}; "
-        "label=\$(cat \"\${base}_label\" 2>/dev/null || basename \"\$base\"); "
-        "value=\$(cat \"\$f\" 2>/dev/null); "
-        "printf 'hwmon %s %s: %s\\n' \"\$chip\" \"\$label\" \"\$value\"; "
-        "done; "
-        "done; "
-        "for z in /sys/class/thermal/thermal_zone*; do "
-        "[ -r \"\$z/temp\" ] || continue; "
-        "t=\$(cat \"\$z/type\" 2>/dev/null || basename \"\$z\"); "
-        "v=\$(cat \"\$z/temp\" 2>/dev/null); "
-        "printf 'sysfs %s: %s\\n' \"\$t\" \"\$v\"; "
-        "done; "
-        "fi; "
-        "if command -v smartctl >/dev/null 2>&1; then "
-        "scan=\$(smartctl --scan-open 2>/dev/null || smartctl --scan 2>/dev/null || true); "
-        "if [ -n \"\$scan\" ]; then "
-        "printf '%s\\n' \"\$scan\" | while read -r d opt dtype rest; do "
-        "[ -n \"\$d\" ] || continue; "
-        "case \"\$d\" in \\#*) continue;; esac; "
-        "if [ \"\$opt\" = \"-d\" ] && [ -n \"\$dtype\" ] && [ \"\$dtype\" != \"#\" ]; then "
-        "printf 'smartctl %s -d %s\\n' \"\$d\" \"\$dtype\"; "
-        "{ smartctl -i -d \"\$dtype\" \"\$d\" 2>/dev/null; "
-        "smartctl -A -d \"\$dtype\" \"\$d\" 2>/dev/null; "
-        "smartctl -l scttempsts -d \"\$dtype\" \"\$d\" 2>/dev/null; } | "
-        "sed -n '/^Device Model:/p;/^Model Number:/p;/^Product:/p;/^Model:/p;/[Tt]emp/p;/194 /p;/190 /p'; "
-        "else "
-        "printf 'smartctl %s\\n' \"\$d\"; "
-        "{ smartctl -i \"\$d\" 2>/dev/null; "
-        "smartctl -A \"\$d\" 2>/dev/null; "
-        "smartctl -l scttempsts \"\$d\" 2>/dev/null; } | "
-        "sed -n '/^Device Model:/p;/^Model Number:/p;/^Product:/p;/^Model:/p;/[Tt]emp/p;/194 /p;/190 /p'; "
-        "fi; "
-        "done; "
-        "else "
-        "for d in /dev/nvme[0-9] /dev/nvme*n1 /dev/sd? /dev/hd? /dev/disk/by-id/ata-*; do "
-        "[ -e \"\$d\" ] || continue; "
-        "case \"\$d\" in *-part*) continue;; esac; "
-        "printf 'smartctl %s\\n' \"\$d\"; "
-        "{ smartctl -i \"\$d\" 2>/dev/null || smartctl -i -d sat \"\$d\" 2>/dev/null; "
-        "smartctl -A \"\$d\" 2>/dev/null || smartctl -A -d sat \"\$d\" 2>/dev/null; "
-        "smartctl -l scttempsts \"\$d\" 2>/dev/null || smartctl -l scttempsts -d sat \"\$d\" 2>/dev/null; } | "
-        "sed -n '/^Device Model:/p;/^Model Number:/p;/^Product:/p;/^Model:/p;/[Tt]emp/p;/194 /p;/190 /p'; "
-        "done; "
-        "fi; "
-        "fi; "
-        "printf '%s\\n' '__PVE''_MANAGER''_TEMP''_END__'; "
-        "exit";
   }
 
   Future<void> executeGuestAction(PveResource guest, GuestAction action) async {
@@ -948,14 +908,29 @@ class ProxmoxClient {
     request.headers.set(HttpHeaders.acceptHeader, 'application/json');
 
     if (needsAuth) {
-      final ticket = authTicket ?? _ticket;
-      if (ticket == null) {
-        throw const ProxmoxApiException(ProxmoxErrorCode.sessionExpired);
-      }
-      request.headers.set(HttpHeaders.cookieHeader, 'PVEAuthCookie=$ticket');
-      final token = csrfToken ?? _csrfToken;
-      if (method != 'GET' && token != null) {
-        request.headers.set('CSRFPreventionToken', token);
+      if (authTicket != null) {
+        request.headers.set(
+          HttpHeaders.cookieHeader,
+          'PVEAuthCookie=$authTicket',
+        );
+        if (method != 'GET' && csrfToken != null) {
+          request.headers.set('CSRFPreventionToken', csrfToken);
+        }
+      } else if (usesApiToken) {
+        request.headers.set(
+          HttpHeaders.authorizationHeader,
+          _apiTokenAuthorizationValue,
+        );
+      } else {
+        final ticket = _ticket;
+        if (ticket == null) {
+          throw const ProxmoxApiException(ProxmoxErrorCode.sessionExpired);
+        }
+        request.headers.set(HttpHeaders.cookieHeader, 'PVEAuthCookie=$ticket');
+        final token = csrfToken ?? _csrfToken;
+        if (method != 'GET' && token != null) {
+          request.headers.set('CSRFPreventionToken', token);
+        }
       }
     }
 
@@ -1085,34 +1060,6 @@ class ProxmoxClient {
       ..badCertificateCallback =
           (X509Certificate cert, String host, int port) =>
               ignoreCertificateErrors;
-  }
-
-  static String _decodeTerminalMessage(dynamic message) {
-    if (message is String) {
-      return message;
-    }
-    if (message is List<int>) {
-      return utf8.decode(message, allowMalformed: true);
-    }
-    return '';
-  }
-
-  static bool _hasTerminalMarkerLine(String output, String marker) {
-    return output.contains(marker);
-  }
-
-  static String _extractMarkedTerminalOutput(String output) {
-    final start = output.indexOf(_temperatureStartMarker);
-    if (start == -1) {
-      return '';
-    }
-
-    final contentStart = start + _temperatureStartMarker.length;
-    final end = output.indexOf(_temperatureEndMarker, contentStart);
-    if (end == -1) {
-      return output.substring(contentStart);
-    }
-    return output.substring(contentStart, end);
   }
 
   static int _typeRank(String type) {
@@ -1273,6 +1220,108 @@ class ProxmoxClient {
   static bool _isTicketChallenge(Object? value) {
     return value?.toString().contains(':!tfa!') ?? false;
   }
+
+  static String _diskDevicePath(Map<String, dynamic> disk) {
+    return disk['devpath']?.toString().trim() ?? '';
+  }
+
+  static void _writePveDiskSmartOutput(
+    StringBuffer output,
+    _PveDiskSmartResult result,
+  ) {
+    final device = _diskDevicePath(result.disk);
+    if (device.isEmpty) {
+      return;
+    }
+
+    final diskType = result.disk['type']?.toString().toLowerCase() ?? '';
+    output.writeln(
+      diskType == 'nvme' ? 'smartctl $device -d nvme' : 'smartctl $device',
+    );
+    final model = _normalizePveDiskModel(result.disk['model']);
+    if (model.isNotEmpty) {
+      output.writeln(
+        diskType == 'nvme' ? 'Model Number: $model' : 'Device Model: $model',
+      );
+    }
+
+    final data = result.response?['data'];
+    if (data is! Map<String, dynamic>) {
+      return;
+    }
+    final temperature = _pveSmartTemperature(data);
+    if (temperature != null) {
+      output.writeln('Current Drive Temperature: $temperature C');
+    }
+  }
+
+  static String _normalizePveDiskModel(Object? value) {
+    return value
+            ?.toString()
+            .trim()
+            .replaceAll(RegExp(r'^_+|_+$'), '')
+            .replaceAll('_', ' ') ??
+        '';
+  }
+
+  static num? _pveSmartTemperature(Map<String, dynamic> data) {
+    final directTemperature = data['temperature'];
+    if (directTemperature is num) {
+      return directTemperature;
+    }
+    final parsedDirectTemperature = num.tryParse(
+      directTemperature?.toString() ?? '',
+    );
+    if (parsedDirectTemperature != null) {
+      return parsedDirectTemperature;
+    }
+
+    final text = data['text']?.toString() ?? '';
+    final textTemperature = RegExp(
+      r'^Temperature:\s*([-+]?\d+(?:\.\d+)?)\s*(?:C|Celsius)\b',
+      caseSensitive: false,
+      multiLine: true,
+    ).firstMatch(text);
+    if (textTemperature != null) {
+      return num.tryParse(textTemperature.group(1)!);
+    }
+
+    final attributes = data['attributes'];
+    if (attributes is! List) {
+      return null;
+    }
+    Map<String, dynamic>? temperatureAttribute;
+    for (final attribute in attributes.whereType<Map<String, dynamic>>()) {
+      final id = attribute['id']?.toString();
+      final name = attribute['name']?.toString().toLowerCase() ?? '';
+      if (id == '194' || name == 'temperature_celsius') {
+        temperatureAttribute = attribute;
+        break;
+      }
+      if (temperatureAttribute == null &&
+          name.contains('temperature') &&
+          !name.contains('throttle')) {
+        temperatureAttribute = attribute;
+      }
+    }
+    if (temperatureAttribute == null) {
+      return null;
+    }
+
+    final raw = temperatureAttribute['raw']?.toString() ?? '';
+    final match = RegExp(r'-?\d+(?:\.\d+)?').firstMatch(raw);
+    if (match != null) {
+      return num.tryParse(match.group(0)!);
+    }
+    return null;
+  }
+}
+
+class _PveDiskSmartResult {
+  const _PveDiskSmartResult({required this.disk, this.response});
+
+  final Map<String, dynamic> disk;
+  final Map<String, dynamic>? response;
 }
 
 class _ApiResponse {

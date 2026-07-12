@@ -209,4 +209,18 @@ Device Model:     NANASHI'S SSD 160G
     ]);
     expect(disks.map((disk) => disk.celsius), [40, 41, 33, 28]);
   });
+
+  test('does not classify smartctl readings as CPU Tctl sensors', () {
+    final state = NodeThermalState.fromJson('''
+coretemp-isa-0000
+Package id 0: +48.0°C
+
+smartctl /dev/nvme0 -d nvme
+Temperature: 52 Celsius
+''');
+
+    expect(state.cpuPackageSensor?.celsius, 48);
+    expect(state.cpuSensors, hasLength(1));
+    expect(state.diskTemperatures.single.celsius, 52);
+  });
 }

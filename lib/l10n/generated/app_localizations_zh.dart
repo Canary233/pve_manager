@@ -293,6 +293,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get realm => 'Realm';
 
   @override
+  String get authMethod => '认证方式';
+
+  @override
+  String get passwordLogin => '密码';
+
+  @override
+  String get apiTokenLogin => 'API 令牌';
+
+  @override
+  String get apiTokenId => '令牌 ID';
+
+  @override
+  String get apiTokenSecret => '令牌密钥';
+
+  @override
   String get allowSelfSignedCertificate => '允许自签名证书';
 
   @override
@@ -324,6 +339,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get enterPassword => '请输入密码';
+
+  @override
+  String get enterApiTokenId => '请输入令牌 ID';
+
+  @override
+  String get enterApiTokenSecret => '请输入令牌密钥';
+
+  @override
+  String get apiTokenWebConsoleUnsupported => 'API 令牌不能用于网页 VNC 控制台，请改用密码登录。';
 
   @override
   String get neverConnected => '从未连接';

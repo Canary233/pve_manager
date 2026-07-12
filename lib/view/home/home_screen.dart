@@ -370,7 +370,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Object _serverKey(PveServerConfig server) {
     return server.id ??
-        Object.hash(server.origin, server.username, server.realm);
+        Object.hash(
+          server.origin,
+          server.username,
+          server.realm,
+          server.authMode,
+          server.apiTokenId,
+        );
   }
 
   @override

@@ -25,6 +25,11 @@ class RemoteConsoleLauncher {
     if (kIsWeb) {
       throw const ProxmoxApiException(ProxmoxErrorCode.webConsoleUnsupported);
     }
+    if (!client.supportsWebConsoleAuthentication) {
+      throw const ProxmoxApiException(
+        ProxmoxErrorCode.apiTokenWebConsoleUnsupported,
+      );
+    }
 
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:

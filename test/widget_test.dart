@@ -3,9 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pve_manager/app/pve_manager_app.dart';
 import 'package:pve_manager/core/widgets/usage_line.dart';
+import 'package:pve_manager/data/models/proxmox_auth_mode.dart';
 import 'package:pve_manager/data/models/pve_server_config.dart';
 import 'package:pve_manager/l10n/generated/app_localizations.dart';
 import 'package:pve_manager/view/home/widgets/server_card.dart';
+import 'package:pve_manager/view/home/widgets/server_form_dialog.dart';
 
 void main() {
   testWidgets('shows the server list home screen', (WidgetTester tester) async {
@@ -89,5 +91,61 @@ void main() {
       find.byType(LinearProgressIndicator),
     );
     expect(indicators.every((indicator) => indicator.value == null), isTrue);
+  });
+
+  testWidgets('server form exposes api token credential fields', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: Locale('zh'),
+        home: Scaffold(body: ServerFormDialog()),
+      ),
+    );
+
+    await tester.tap(find.text('API 令牌'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('令牌 ID'), findsOneWidget);
+    expect(find.text('令牌密钥'), findsOneWidget);
+    expect(find.text('用户名'), findsNothing);
+    expect(find.text('Realm'), findsNothing);
+    expect(find.byIcon(Icons.badge_rounded), findsOneWidget);
+  });
+
+  testWidgets('api token edit form reconstructs the complete token id', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: Locale('zh'),
+        home: Scaffold(
+          body: ServerFormDialog(
+            server: PveServerConfig(
+              name: 'API',
+              origin: 'https://pve.example:8006',
+              username: 'root',
+              password: '',
+              realm: 'pam',
+              authMode: ProxmoxAuthMode.apiToken,
+              apiTokenId: 'mobile',
+              apiTokenSecret: 'secret-uuid',
+              ignoreCertificateErrors: true,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final tokenIdFields = tester
+        .widgetList<TextFormField>(find.byType(TextFormField))
+        .where((field) => field.controller?.text == 'root@pam!mobile');
+    expect(tokenIdFields, hasLength(1));
+    expect(find.text('用户名'), findsNothing);
+    expect(find.text('Realm'), findsNothing);
   });
 }

@@ -17,6 +17,7 @@ enum ProxmoxErrorCode {
   webConsoleUnsupported,
   nativeConsoleMissing,
   consoleOpenFailed,
+  apiTokenWebConsoleUnsupported,
   platformConsoleUnsupported,
 }
 
@@ -64,6 +65,8 @@ class ProxmoxApiException implements Exception {
       ProxmoxErrorCode.webConsoleUnsupported => l10n.webConsoleUnsupported,
       ProxmoxErrorCode.nativeConsoleMissing => l10n.nativeConsoleMissing,
       ProxmoxErrorCode.consoleOpenFailed => l10n.consoleOpenFailed,
+      ProxmoxErrorCode.apiTokenWebConsoleUnsupported =>
+        l10n.apiTokenWebConsoleUnsupported,
       ProxmoxErrorCode.platformConsoleUnsupported =>
         l10n.platformConsoleUnsupported,
     };

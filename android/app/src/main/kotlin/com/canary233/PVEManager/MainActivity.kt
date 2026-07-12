@@ -7,6 +7,8 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    private var activeToast: Toast? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -80,8 +82,19 @@ class MainActivity : FlutterActivity() {
                 return@setMethodCallHandler
             }
 
-            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            activeToast?.cancel()
+            activeToast = Toast.makeText(
+                applicationContext,
+                message,
+                Toast.LENGTH_SHORT
+            ).also(Toast::show)
             result.success(null)
         }
+    }
+
+    override fun onDestroy() {
+        activeToast?.cancel()
+        activeToast = null
+        super.onDestroy()
     }
 }

@@ -295,6 +295,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get realm => 'Realm';
 
   @override
+  String get authMethod => 'Authentication';
+
+  @override
+  String get passwordLogin => 'Password';
+
+  @override
+  String get apiTokenLogin => 'API token';
+
+  @override
+  String get apiTokenId => 'Token ID';
+
+  @override
+  String get apiTokenSecret => 'Token secret';
+
+  @override
   String get allowSelfSignedCertificate => 'Allow self-signed certificate';
 
   @override
@@ -326,6 +341,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get enterPassword => 'Enter password';
+
+  @override
+  String get enterApiTokenId => 'Enter the token ID';
+
+  @override
+  String get enterApiTokenSecret => 'Enter the token secret';
+
+  @override
+  String get apiTokenWebConsoleUnsupported =>
+      'API tokens cannot authenticate the web VNC console. Use password login instead.';
 
   @override
   String get neverConnected => 'Never connected';
