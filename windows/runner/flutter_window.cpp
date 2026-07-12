@@ -1,8 +1,37 @@
 #include "flutter_window.h"
 
+#include <dwmapi.h>
+#include <flutter/standard_method_codec.h>
+
+#include <cstdint>
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+
+namespace {
+
+std::optional<int64_t> GetWindowsAccentColor() {
+  DWORD abgr = 0;
+  DWORD value_size = sizeof(abgr);
+  if (RegGetValueW(
+          HKEY_CURRENT_USER,
+          L"Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Accent",
+          L"AccentColorMenu", RRF_RT_REG_DWORD, nullptr, &abgr,
+          &value_size) == ERROR_SUCCESS) {
+    const DWORD argb = (abgr & 0xFF00FF00) | ((abgr & 0xFF) << 16) |
+                       ((abgr & 0xFF0000) >> 16);
+    return static_cast<int64_t>(argb);
+  }
+
+  DWORD argb = 0;
+  BOOL opaque = FALSE;
+  if (SUCCEEDED(DwmGetColorizationColor(&argb, &opaque))) {
+    return static_cast<int64_t>(argb);
+  }
+  return std::nullopt;
+}
+
+}  // namespace
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -25,6 +54,24 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  dynamic_color_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(),
+          "pve_manager/dynamic_color",
+          &flutter::StandardMethodCodec::GetInstance());
+  dynamic_color_channel_->SetMethodCallHandler(
+      [](const auto& call, auto result) {
+        if (call.method_name() != "getAccentColor") {
+          result->NotImplemented();
+          return;
+        }
+        const auto accent = GetWindowsAccentColor();
+        if (accent.has_value()) {
+          result->Success(flutter::EncodableValue(accent.value()));
+        } else {
+          result->Success(flutter::EncodableValue());
+        }
+      });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -40,6 +87,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  dynamic_color_channel_.reset();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }

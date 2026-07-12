@@ -1,6 +1,7 @@
 package com.canary233.PVEManager
 
 import android.content.Intent
+import android.os.Build
 import android.widget.Toast
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -90,6 +91,47 @@ class MainActivity : FlutterActivity() {
             ).also(Toast::show)
             result.success(null)
         }
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "pve_manager/dynamic_color"
+        ).setMethodCallHandler { call, result ->
+            if (call.method != "getCorePalette") {
+                result.notImplemented()
+                return@setMethodCallHandler
+            }
+            result.success(readSystemCorePalette())
+        }
+    }
+
+    private fun readSystemCorePalette(): IntArray? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return null
+        }
+
+        val palettes = listOf(
+            "system_accent1",
+            "system_accent2",
+            "system_accent3",
+            "system_neutral1",
+            "system_neutral2"
+        )
+        val tones = listOf(1000, 900, 800, 700, 600, 500, 400, 300, 200, 100, 50, 10, 0)
+        val colors = ArrayList<Int>(palettes.size * tones.size)
+        for (palette in palettes) {
+            for (tone in tones) {
+                val resourceId = resources.getIdentifier(
+                    "${palette}_$tone",
+                    "color",
+                    "android"
+                )
+                if (resourceId == 0) {
+                    return null
+                }
+                colors.add(resources.getColor(resourceId, null))
+            }
+        }
+        return colors.toIntArray()
     }
 
     override fun onDestroy() {
